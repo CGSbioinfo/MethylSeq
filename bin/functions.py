@@ -10,7 +10,14 @@ import pickle
 import logging
 from joblib import Parallel, delayed
 import multiprocessing
+import argparse
 
+__version__= 'v01'
+# Created on 17/08/2016
+
+parser=argparse.ArgumentParser(prog='functions.py')
+parser.add_argument('-v','--version', action='version',version='%(prog)s-'+__version__)
+args=parser.parse_args()
 
 def make_sure_path_exists(path):
     try:
