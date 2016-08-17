@@ -1,9 +1,0 @@
-Working directory = 
-reads_dir = 
-Reference Genome = 
-GTF File = 
-BedFile = 
-BedFile10K = 
-refFlat = 
-rRNA_interval_list = 
-strand = 
