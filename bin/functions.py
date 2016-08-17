@@ -41,31 +41,12 @@ def read_analysis_info_file(info_file):
     
     """ Reads the analysis_info_file and creates variables for each element """
 
-    args = {}
+    analysis_info_dict = {}
     with open(info_file, 'r') as f:
         for line in f:
             entry = line.strip().split("=")
-            if entry[0]:
-                args[entry[0].strip(" ")] = entry[1].strip()
-    global path
-    path = args['Working directory'].replace("\\", "")
-    global gtfFile
-    gtfFile = args['GTF File']
-    global refGenome
-    refGenome = args['Reference Genome']
-    global bedFile
-    bedFile = args['BedFile']
-    global bedFile_10k
-    bedFile_10k = args['BedFile10K']
-    global refFlat
-    refFlat = args['refFlat']
-    global rRNA_interval_list
-    rRNA_interval_list = args['rRNA_interval_list']
-    global strand
-    strand = args['strand']
-    global reads_dir
-    reads_dir = args['reads_dir']
-    return(args)
+            analysis_info_dict[entry[0].strip()]= entry[1].strip()
+    return(analysis_info_dict)
 
 def create_rawReads_folder(sampleNames):
     """ Creates a rawReads/ folder and subfolders for each sample. Moves the fastq reads from reads_dir/ to their corresponding sample subfolder"""
