@@ -25,7 +25,7 @@ if __name__ == '__main__':
 
     parser=argparse.ArgumentParser(prog='analysis_info.py')
     parser.add_argument('-v','--version',action='version',version='%(prog)s-'+__version__)
-    parser.add_Argument('--outfile', help='Name of the output file. Default=analysis_info.txt', default='analysis_info.txt')
+    parser.add_argument('--outfile', help='Name of the output file. Default=analysis_info.txt', default='analysis_info.txt')
     args=parser.parse_args()
 
     outfile_name=args.outfile
