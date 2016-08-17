@@ -64,7 +64,21 @@ bcl2fastq_output = /mnt/cgs-fs2/Bioinfo_pipeline/MethylSeq/test/aug2016/heroG/fa
 ```bash
  $ python bin/create_sampleNames.py
 ```
-  
+
+10. Run organizeWorkingDirectory.py. This creates a folder called rawReads/ with subfolders corresponding to each sample, and fastq files sorted according to sample name. This structure is useful for further steps in the analysis
+```bash
+ python bin/organizeWorkingDirectory.py 
+```
+
+We are ready now to run the main steps of the pipeline
+#### Quality control and trimming
+
+11. Our fastq files are organized now in the rawReads/ folder. The next command will run fastqc in all our samples and create a csv file with the number of reads in each sample. The output of the fastqc is created im rawReads/, in the corresponding sample folder. The csv file is created in a Report/figure/dataQC/ folder 
+```bash
+ python bin/qcReads.py
+```
+
+
 
 1.	Go to the main folder of the project and run
 ```bash

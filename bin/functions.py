@@ -48,7 +48,7 @@ def read_analysis_info_file(info_file):
             analysis_info_dict[entry[0].strip()]= entry[1].strip()
     return(analysis_info_dict)
 
-def create_rawReads_folder(sampleNames):
+def create_rawReads_folder(sampleNames, reads_dir):
     """ Creates a rawReads/ folder and subfolders for each sample. Moves the fastq reads from reads_dir/ to their corresponding sample subfolder"""
 
     # Check if rawReads exists
