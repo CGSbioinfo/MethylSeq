@@ -32,7 +32,8 @@ Important note: All the main python scripts have a help page, so if unsure on ho
  $ mkdir bin/ 
 ```
 
-4. Download the scripts from https://github.com/CGSbioinfo/MethylSeq to any location. For example, I downloaded the zip folder to /home/mjg225/Downloads. Unzip the folder. **DO NOT move to that folder, just check that is exists and the download was successfull.
+4. Download the scripts from https://github.com/CGSbioinfo/MethylSeq to any location. For example, I downloaded the zip folder to /home/mjg225/Downloads. *DO NOT* move to that folder, just check that is exists and the download was successfull. 
+Unziup the folder from your location. 
 ```bash
  $ unzip /home/mjg225/Downloads/MethylSeq-master
 ```
