@@ -29,9 +29,25 @@ Important note: All the main python scripts have a help page, so if unsure on ho
 
 3. Create a bin/ folder. This folder will have the scripts you need to run the analysis:
 ```bash
- $ mkdir bin/
- $ 
+ $ mkdir bin/ 
 ```
+
+4. Download the scripts from https://github.com/CGSbioinfo/MethylSeq to any location. For example, I downloaded the zip folder to /home/mjg225/Downloads. Unzip the folder.
+```bash
+ $ unzip /home/mjg225/Downloads/MethylSeq-master
+```
+A folder named "MethylSeq-master" should appear.
+
+5. Move the contents of MethylSeq-maste/bin to bin/
+```bash
+ $ mv MethylSeq-master/bin/* bin/
+```
+
+At this point you should have a directory where you will do the analysis and a bin/ folder in such directory with the analysis scripts copied from the github download.
+
+
+
+ 
 
 
 
