@@ -73,12 +73,17 @@ bcl2fastq_output = /mnt/cgs-fs2/Bioinfo_pipeline/MethylSeq/test/aug2016/heroG/fa
 We are ready now to run the main steps of the pipeline
 #### Quality control and trimming
 
-11. Our fastq files are organized now in the rawReads/ folder. The next command will run fastqc in all our samples and create a csv file with the number of reads in each sample. The output of the fastqc is created im rawReads/, in the corresponding sample folder. The csv file is created in a Report/figure/dataQC/ folder 
+11. Our fastq files are organized now in the rawReads/ folder. The next command will run fastqc in all our samples and create a csv file with the number of reads in each sample. The output of the fastqc is created in rawReads/, in the corresponding sample folder. The csv file is created in a Report/figure/dataQC/ folder 
 ```bash
  python bin/qcReads.py
 ```
 
+12. The next line takes the output of fastqc and makes some tables and plots to include in the Report. The tables are saved in rawReads/sampleX/sampleX_fastqc/ , and the plots are saved by default in Report/figure/rawQC. 
+```bash
+python bin/fastqc_tables_and_plots.py --in_dir rawReads/ --out_dir_report Report/figure/rawQC --suffix_name _raw --sample_names_file sample_names.txt --plot_device pdf
+```
 
+13. 
 
 1.	Go to the main folder of the project and run
 ```bash
