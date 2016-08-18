@@ -83,7 +83,12 @@ We are ready now to run the main steps of the pipeline
  $ python bin/fastqc_tables_and_plots.py --in_dir rawReads/ --out_dir_report Report/figure/rawQC --suffix_name _raw --sample_names_file sample_names.txt --plot_device pdf
 ```
 
-13. 
+13. Next run the trimming script:
+```bash
+ $ python bin/trimmingReads.py --in_dir rawReads/ --out_dir trimmedReads --ncores 6 
+```
+
+
 
 1.	Go to the main folder of the project and run
 ```bash

@@ -40,7 +40,7 @@ if __name__ == '__main__':
     parser.add_argument('--in_dir', help='Path to folder containing fastq files. Default=rawReads/', default='rawReads/')
     parser.add_argument('--out_dir', help='Path to out put folder. Default=rawReads/', default='rawReads/')
     parser.add_argument('--out_dir_report', help='Path to out put folder. Default=Report/figure/data/', default='Report/figure/data/')
-    parser.add_argument('--sample_names_file', help='Text file with sample names. Default=sample_names_info.txt', default='sample_names.txt')
+    parser.add_argument('--sample_names_file', help='Text file with sample names. Default=sample_names.txt', default='sample_names.txt')
     parser.add_argument('--ncores', help='Number of cores to use. Default=8', default='8')
     args=parser.parse_args()
 
