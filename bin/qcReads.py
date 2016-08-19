@@ -67,7 +67,7 @@ if __name__ == '__main__':
     gz = functions.check_gz(in_dir)
 
     # Run fastqc
-    #Parallel(n_jobs=ncores)(delayed(qc_check)(i) for i in sampleNames)
+    Parallel(n_jobs=ncores)(delayed(qc_check)(i) for i in sampleNames)
 
     # Number of reads per sample
     os.system("Rscript bin/indexQC.R " + in_dir + " " + out_dir_report) 

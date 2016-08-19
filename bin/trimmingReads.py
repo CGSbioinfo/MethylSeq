@@ -63,7 +63,7 @@ if __name__ == '__main__':
 
     # Run trimm galore
     functions.make_sure_path_exists(out_dir)
-    Parallel(n_jobs=7)(delayed(trimming)(i) for i in sampleNames)
+    Parallel(n_jobs=ncores)(delayed(trimming)(i) for i in sampleNames)
     functions.make_sure_path_exists(out_dir_report)
     
     # Nreads

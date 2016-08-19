@@ -48,6 +48,7 @@ if __name__ == '__main__':
     elif args.in_dir != 'bcl2fastq_output':
         allFiles=os.listdir(args.in_dir)
         fastq=[allFiles[y] for y, x in enumerate(allFiles) if re.findall("fastq.gz", x)]
+        fastq=[args.in_dir + x for x in fastq]
 
     # Move reads
     if not readsFiles:
@@ -58,7 +59,6 @@ if __name__ == '__main__':
             if sample not in sampleDir:
                 functions.make_sure_path_exists('rawReads/'+sample)
             for r in reads:
-               #r = reads_dir + '/' + r
                os.system('mv ' + '"' + r + '"' + ' rawReads/' + sample)
             sampleDir.append(sample)
     else:

@@ -29,7 +29,7 @@ if __name__ == '__main__':
     args=parser.parse_args()
 
     outfile_name=args.outfile
-    lines=['working_directory = ', 'run_folder = ', 'run_samplesheet = ', 'bcl2fastq_output = ', 'reference_genome = ']
+    lines=['working_directory = ', 'run_folder = ', 'run_samplesheet = ', 'bcl2fastq_output = ', 'reference_genome = ', 'bismark_params = --bowtie2; --bam; --directional; -N 0; -L 20; --no-mixed; --no-discordant; -D 15; -R 2; --score_min L,0,-0.2; ']
     outfile=open(outfile_name,'w')
     for l in lines:
         outfile.write(l + '\n')

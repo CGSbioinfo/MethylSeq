@@ -198,3 +198,65 @@ if (readType=='pairedEnd') {
 }
 ggsave(filename=paste0(outdir,'/sequence_dup_levels', suffix, '.', plot_device), width=10, height=3.5, units='in', plot=p)
 
+
+
+# Base content
+#-----------------------
+base_content=files[grep('per_base_sequence_content.txt',files)]
+mr1=matrix(ncol=5)
+colnames(mr1)=c('Base', 'Percentage', 'Nucleotide','Sample','Read')
+for (i in 1:length(sample_names)){
+  x=base_content[grep(sample_names[i],base_content)]
+  x=x[grep('_R1_',x)]
+  x=read.table(x, stringsAsFactors = FALSE)
+  colnames(x)=c('Base','G','A', 'T', 'C')
+  all=matrix(ncol=3)
+  colnames(all)=c('Base','Percentage','Nucleotide')
+  nt=c('G','A','T','C')
+  for (j in 1:length(nt)){
+    all=rbind(all,cbind(x[,1], 'Percentage'=x[,which(colnames(x)==nt[j])], 'Nucleotide'=nt[j]))
+  }
+  all=as.data.frame(all[-1,])
+  all$Percentage=as.numeric(as.character(all$Percentage))
+  all$Read='Read 1'
+  all$Sample=sample_names[i]
+  mr1=rbind(mr1,all)
+}
+mr1=mr1[-1,]
+mr1$Base=factor(mr1$Base, levels=unique(mr1$Base))
+p=ggplot(mr1, aes(x=Base, y=Percentage, group=Sample, colour=Sample, shape=Sample)) + geom_line(size=.2) + geom_point(size=0.8) + facet_wrap(~Nucleotide) + 
+    theme(axis.text.x = element_text(size = 7, angle=90, v=0.5), axis.text.y = element_text(size = 7), legend.text=element_text(size=6), legend.title=element_text(size=7),
+          axis.title=element_text(size=8), legend.key.height=unit(.8,"line"), strip.text=element_text(size=7, face='bold'), panel.background=element_rect(fill='white'), panel.grid.major=element_line(colour='grey',size=.2, linetype=2), panel.grid.minor=element_line(colour='grey',size=.2,linetype=2)) + 
+    xlab("Position") + scale_shape_manual(values=1:length(unique(mr1$Sample))) + scale_x_discrete(breaks = c('1','25','50','75','100'))
+ggsave(filename=paste0(outdir,'/per_base_sequence_content_r1', suffix, '.', plot_device), width=8, height=3.5, units='in', plot=p)
+
+if (readType=='pairedEnd') {
+    mr2=matrix(ncol=5)
+    colnames(mr2)=c('Base', 'Percentage', 'Nucleotide','Sample','Read')
+    for (i in 1:length(sample_names)){
+      x=base_content[grep(sample_names[i],base_content)]
+      x=x[grep('_R2_',x)]
+      x=read.table(x, stringsAsFactors = FALSE)
+      colnames(x)=c('Base','G','A', 'T', 'C')
+      all=matrix(ncol=3)
+      colnames(all)=c('Base','Percentage','Nucleotide')
+      nt=c('G','A','T','C')
+      for (j in 1:length(nt)){
+        all=rbind(all,cbind(x[,1], 'Percentage'=x[,which(colnames(x)==nt[j])], 'Nucleotide'=nt[j]))
+      }
+      all=as.data.frame(all[-1,])
+      all$Percentage=as.numeric(as.character(all$Percentage))
+      all$Read='Read 2'
+      all$Sample=sample_names[i]
+      mr2=rbind(mr2,all)
+    }
+mr2=mr2[-1,]
+mr2$Base=factor(mr2$Base, levels=unique(mr2$Base))
+p=ggplot(mr2, aes(x=Base, y=Percentage, group=Sample, colour=Sample, shape=Sample)) + geom_line(size=.2) + geom_point(size=0.8) + facet_wrap(~Nucleotide) + 
+    theme(axis.text.x = element_text(size = 7, angle=90, v=0.5), axis.text.y = element_text(size = 7), legend.text=element_text(size=6), legend.title=element_text(size=7),
+          axis.title=element_text(size=8), legend.key.height=unit(.8,"line"), strip.text=element_text(size=7, face='bold'), panel.background=element_rect(fill='white'), panel.grid.major=element_line(colour='grey',size=.2, linetype=2), panel.grid.minor=element_line(colour='grey',size=.2,linetype=2)) + 
+    xlab("Position") + scale_shape_manual(values=1:length(unique(mr2$Sample))) + scale_x_discrete(breaks = c('1','25','50','75','100'))
+
+}
+ggsave(filename=paste0(outdir,'/per_base_sequence_content_r2', suffix, '.', plot_device), width=8, height=3.5, units='in', plot=p)
+

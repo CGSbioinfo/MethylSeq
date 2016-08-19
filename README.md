@@ -88,19 +88,16 @@ We are ready now to run the main steps of the pipeline
  $ python bin/trimmingReads.py --in_dir rawReads/ --out_dir trimmedReads --ncores 6 
 ```
 
-
-
-1.	Go to the main folder of the project and run
+14. The next line takes the output of trimmedReads fastqc and makes some tables and plots to include in the Report. The tables are saved in trimmedReads/, and the output report folder should be indicated.
 ```bash
- $ analysis_info.py
+ $ python bin/fastqc_tables_and_plots.py --in_dir trimmedReads/ --out_dir_report Report/figure/trimmedQC --suffix_name _trimmed --sample_names_file sample_names.txt --plot_device pdf
 ```
-This will create a file named analysis_info.txt, which needs to be filled in a text editor. For more details about how to fill this file, see analysis_info_guide.txt
 
-2.	Create a sample_names.txt file with the list of the sample names. If your fastq files are saved in the reads/ subfolder, you can run
+#### Mapping and de-duplication
+15. First make sure that the reference genome is correctly indicated in the analysis_info.txt. Also see the bismark default parameters. You can change or add parameters.
 ```bash
- $ ls reads/*fastq.gz | sed 's/.*\///g' | sed 's/_R.*//g' | uniq > sample_names.txt
+ $ python bin/mappingReads.py --in_dir trimmedReads/ --out_dir alignedReads --ncores 2 
 ```
-The names of the samples normally consist of sampleX_S1, sampleY_S2, etc.
 
 
 
