@@ -1,21 +1,25 @@
 # MethylSeq pipeline
 
-
------------------------------
+----
 #### Software and scripts required
------------------------------
 
 Software: 
 - bcl2fastq
 - FastQC
 - Trim Galore
+- Bismark
+
+R packages:
+- ggplot2
+- reshape
+- grid
+- xtable
 
 
-
-
+---- Before running the pipeline
 ## Run the pipeline
 
-Important note: All the main python scripts have a help page, so if unsure on how to use it or require information about default and additional arguments, check. For example:
+Important note: Most python scripts have a help page, so if unsure on how to use it or require information about default and additional arguments, check. For example:
 ```bash
  $ analysis_info.py -h
 ```
