@@ -25,13 +25,13 @@ Important note: Most python scripts have a help page, so if unsure on how to use
 ```
 
 ### Starting an analysis and downloading the scripts.
-1\. Go to your home folder. For example:
+**1**\. Go to your home folder. For example:
 ```bash
  $ cd /mnt/research/mjg225/
 ```
   
   
-2\. Create a directory where you will do the analysis and go to that folder. For example:
+**2**\. Create a directory where you will do the analysis and go to that folder. For example:
 ```bash
  $ mkdir methylSeq/pipelineTest/heroG/aug2016
  $ cd methylSeq/pipelineTest/heroG/aug2016
