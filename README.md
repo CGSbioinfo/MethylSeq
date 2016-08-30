@@ -62,10 +62,7 @@ At this point you should have a directory where you will do the analysis and a b
 
 A file named 'analysis_info.txt' will be created in the folder. Open it in a text editor or vi and fill it. For example: 
 >Working directory = /mnt/cgs-fs2/Bioinfo_pipeline/MethylSeq/test/aug2016/heroG/ 
-
-
 >run_folder = /mnt/cgs-fs3/Sequencing/NextSeq_Output/160711_NS500125_0298_AHFW35BGXY/
-
 >run_samplesheet = /mnt/cgs-fs3/Sequencing/NextSeq_Output/160711_NS500125_0298_AHFW35BGXY/SampleSheet.csv
 >bcl2fastq_output = /mnt/cgs-fs2/Bioinfo_pipeline/MethylSeq/test/aug2016/heroG/fastq/
 
