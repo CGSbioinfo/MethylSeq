@@ -38,27 +38,27 @@ Important note: Most python scripts have a help page, so if unsure on how to use
 ```
   
   
-3\. Create a bin/ folder. This folder will have the scripts you need to run the analysis:
+**3**\. Create a bin/ folder. This folder will have the scripts you need to run the analysis:
 ```bash
  $ mkdir bin/ 
 ```
   
   
-4\. Go to https://github.com/CGSbioinfo/MethylSeq. Click on the green top right button "Clone or download". This will download the scripts to the Downloads/ folder in your home directory (for example: /home/mjg225/Downloads/). Make sure it exists by typing the following (Note that /home/mjg225/ should be replaced with your own home directory): 
+**4**\. Go to https://github.com/CGSbioinfo/MethylSeq. Click on the green top right button "Clone or download". This will download the scripts to the Downloads/ folder in your home directory (for example: /home/mjg225/Downloads/). Make sure it exists by typing the following (Note that /home/mjg225/ should be replaced with your own home directory): 
 ```bash
  $ ls /home/mjg225/Downloads/MethylSeq-master
 ```
 This should print on your terminal screen the MethylSeq-master folder
   
   
-5\. From your currect directory, unzip the file (Note that /home/mjg225/ should be replaced with your own home directory):
+**5**\. From your currect directory, unzip the file (Note that /home/mjg225/ should be replaced with your own home directory):
 ```bash
  $ unzip /home/mjg225/Downloads/MethylSeq-master
 ```
 A folder named "MethylSeq-master" should appear. Check by just typing ls.
   
   
-6\. Move the contents of MethylSeq-master/bin to bin/
+**6**\. Move the contents of MethylSeq-master/bin to bin/
 ```bash
  $ mv MethylSeq-master/bin/* bin/
 ```
@@ -66,7 +66,7 @@ At this point you should have a directory where you will do the analysis and a b
   
   
 
-7\. Run the analysis_info.py script
+**7**\. Run the analysis_info.py script
 ```bash  
 $ python bin/analysis_info.py
 ```
