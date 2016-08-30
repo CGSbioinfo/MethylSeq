@@ -16,31 +16,35 @@ Important note: All the main python scripts have a help page, so if unsure on ho
 ```
 
 #### Setting up the analysis
-1. Go to your home folder. For example:
+1) Go to your home folder. For example:
 ```bash
  $ cd /mnt/research/mjg225/
 ```
 
-2. Create a directory where you will do the analysis and go to that folder. For example:
+2) Create a directory where you will do the analysis and go to that folder. For example:
 ```bash
  $ mkdir methylSeq/pipelineTest/heroG/aug2016
  $ cd methylSeq/pipelineTest/heroG/aug2016
 ```
 
-3. Create a bin/ folder. This folder will have the scripts you need to run the analysis:
+3) Create a bin/ folder. This folder will have the scripts you need to run the analysis:
 ```bash
  $ mkdir bin/ 
 ```
 
-4. Go to https://github.com/CGSbioinfo/MethylSeq. Click on the green top right button "Clone or download". 
+4. Go to https://github.com/CGSbioinfo/MethylSeq. Click on the green top right button "Clone or download". This will download the scripts to the Downloads/ folder in your home directory (for example: /home/mjg225/Downloads/). Make sure it exists by typing the following (Note that /home/mjg225/ should be replaced with your own home directory): 
+```bash
+ $ ls /home/mjg225/Downloads/MethylSeq-master
+```
+This should print on your terminal screen the MethylSeq-master folder
 
-Download the scripts from https://github.com/CGSbioinfo/MethylSeq to any location. For example, I downloaded the zip folder to /home/mjg225/Downloads. **DO NOT** move to that folder, just check that it exists and the download was successfull. Unziup the folder from your location. 
+5. From your currect directory, unzip the file (Note that /home/mjg225/ should be replaced with your own home directory):
 ```bash
  $ unzip /home/mjg225/Downloads/MethylSeq-master
 ```
-A folder named "MethylSeq-master" should appear.
+A folder named "MethylSeq-master" should appear. Check by just typing ls.
 
-5. Move the contents of MethylSeq-maste/bin to bin/
+5. Move the contents of MethylSeq-master/bin to bin/
 ```bash
  $ mv MethylSeq-master/bin/* bin/
 ```
