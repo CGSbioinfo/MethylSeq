@@ -58,10 +58,9 @@ At this point you should have a directory where you will do the analysis and a b
 #### Providing information about the analysis and setting up a working directory.
 
 1) Run the analysis_info.py script
-```bash
  $ python bin/analysis_info.py
-```
-A file named 'analysis_info.txt' will be created in the folder. Open it in a text editor or vi and fill it. For example: \\
+
+A file named 'analysis_info.txt' will be created in the folder. Open it in a text editor or vi and fill it. For example: 
 Working directory = /mnt/cgs-fs2/Bioinfo_pipeline/MethylSeq/test/aug2016/heroG/ 
 run_folder = /mnt/cgs-fs3/Sequencing/NextSeq_Output/160711_NS500125_0298_AHFW35BGXY/
 run_samplesheet = /mnt/cgs-fs3/Sequencing/NextSeq_Output/160711_NS500125_0298_AHFW35BGXY/SampleSheet.csv
