@@ -32,19 +32,19 @@ Important note: All the main python scripts have a help page, so if unsure on ho
  $ mkdir bin/ 
 ```
 
-4. Go to https://github.com/CGSbioinfo/MethylSeq. Click on the green top right button "Clone or download". This will download the scripts to the Downloads/ folder in your home directory (for example: /home/mjg225/Downloads/). Make sure it exists by typing the following (Note that /home/mjg225/ should be replaced with your own home directory): 
+4) Go to https://github.com/CGSbioinfo/MethylSeq. Click on the green top right button "Clone or download". This will download the scripts to the Downloads/ folder in your home directory (for example: /home/mjg225/Downloads/). Make sure it exists by typing the following (Note that /home/mjg225/ should be replaced with your own home directory): 
 ```bash
  $ ls /home/mjg225/Downloads/MethylSeq-master
 ```
 This should print on your terminal screen the MethylSeq-master folder
 
-5. From your currect directory, unzip the file (Note that /home/mjg225/ should be replaced with your own home directory):
+5) From your currect directory, unzip the file (Note that /home/mjg225/ should be replaced with your own home directory):
 ```bash
  $ unzip /home/mjg225/Downloads/MethylSeq-master
 ```
 A folder named "MethylSeq-master" should appear. Check by just typing ls.
 
-5. Move the contents of MethylSeq-master/bin to bin/
+6) Move the contents of MethylSeq-master/bin to bin/
 ```bash
  $ mv MethylSeq-master/bin/* bin/
 ```
