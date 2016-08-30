@@ -92,19 +92,22 @@ Explanation of 'analysis_info.txt':
 >ncores = *\<Number of cores to use to pararellize analysis\>*
 
 #### Running the analysis
-All the analysis scripts are wrapped in the main python script **runMethylationAnalysis.py**. This main script takes an argument *--run*, which is used to indicate which section of the main script to run. The following commands are used to run the analysis with the main script:
+All the analysis scripts are wrapped in the main python script **runMethylationAnalysis.py**. This main script takes an argument *--run*, which is used to indicate which section of the main script to run. The following commands are used to run the analysis with the main script:  
 
+##### Step 1
 1\. Using the command *--run step1_prepare_analysis*, the main script will read the analysis_info_file and run bcl2fastq, create a sample names file, and organize the working directory.
 ```bash
 $ python bin/runMethylationAnalysis.py --run step1_prepare_analysis
 ```
-Once it finishes, there will be a folder named rawReads with fastq files sorted according to sample names. There will also be a sample_names.txt file with a list of sample names, one per line. 
+Once it finishes, there will be a folder named rawReads with fastq files sorted according to sample names. There will also be a sample_names.txt file with a list of sample names, one per line.  
 
+##### Step 2 
 2\. Using the command *--run step2_qc_and_trimming*, the main script will read the analysis_info_file, the sample_names files and run fastqc, create a folder Report/figure/rawQC with plots, create a folder Report/figure/data with tables, run trim galore, run fastqc on the trimmed reads, and create a folder Report/figure/trimmedQC with plots:
 ```bash
 $ python bin/runMethylationAnalysis.py --run step2_qc_and_trimming
 ```
 
+##### Step 2
 
 
 
