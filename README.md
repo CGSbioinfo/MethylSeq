@@ -71,7 +71,7 @@ A file named 'analysis_info.txt' will be created in the folder. Open it in a tex
 >target_regions_bed =  
 
 Explanation of 'analysis_info.txt':
->Working directory = *path to directory of the analysis*  
+>Working directory = *<path to directory of the analysis>*  
 >run_folder = *path to the run folder*  
 >run_samplesheet = *sample sheet used to generate fastq files. This is created using the Illumina Expert Manager*  
 >bcl2fastq_output = *path to the desired output of bcl2fastq. The defaults is fastq/ and the folder will be created automatically*  
