@@ -5,6 +5,11 @@
 #### Software and scripts required
 -----------------------------
 
+Software: 
+- bcl2fastq
+- FastQC
+- Trim Galore
+
 
 
 
@@ -67,23 +72,45 @@ A file named 'analysis_info.txt' will be created in the folder. Open it in a tex
 >run_folder = /mnt/cgs-fs3/Sequencing/NextSeq_Output/160711_NS500125_0298_AHFW35BGXY/  
 >run_samplesheet = /mnt/cgs-fs3/Sequencing/NextSeq_Output/160711_NS500125_0298_AHFW35BGXY/SampleSheet.csv  
 >bcl2fastq_output = /mnt/cgs-fs2/Bioinfo_pipeline/MethylSeq/test/aug2016/heroG/fastq/  
+>readType = pairedEnd  
 >reference_genome =  
 >bismark_params = --bowtie2; --bam; --directional; -N 0; -L 20; --no-mixed; --no-discordant; -D 15; -R 2; --score_min L,0,-0.2;  
 >methyl_extract_params= --bedGraph; --gzip; --merge_non_CpG;  
 >target_regions_bed =  
+>ncores = 8  
 
 Explanation of 'analysis_info.txt':
 >Working directory = *\<path to directory of the analysis\>*  
 >run_folder = *\<path to the run folder\>*  
 >run_samplesheet = *\<sample sheet used to generate fastq files. This is created using the Illumina Expert Manager\>*  
->bcl2fastq_output = *\<path to the desired output of bcl2fastq. The defaults is fastq/ and the folder will be created automatically*  
+>bcl2fastq_output = *\<path to the desired output of bcl2fastq. The defaults is fastq/ and the folder will be created automatically\>*  
+>readType = *\<either pairedEnd or singleEnd\>*
 >reference_genome = *\<path to the bismark reference genome that will be used at the mapping step\>*  
 >bismark_params = *\<parameters passed to the bismark script. Leave the default, and you can add additional parameters separated by ";"\>*  
 >methyl_extract_params= *\<parameters passed to the methyl extractor script. Leave the default, and you can add additional parameters separated by ";"\>*  
 >target_regions_bed = *\<path to bedfile\>*  
+>ncores = *\<Number of cores to use to pararellize analysis\>*
+
+#### Running the analysis
+All the analysis scripts are wrapped in the main python script **runMethylationAnalysis.py**. This main script takes an argument *--run*, which is used to indicate which section of the main script to run. The following commands are used to run the analysis with the main script:
+
+1\. Using the command *--run step1_prepare_analysis*, the main script will read the analysis_info_file and run bcl2fastq, create a sample names file, and organize the working directory.
+```bash
+$ python bin/runMethylationAnalysis.py --run step1_prepare_analysis
+```
+Once it finishes, there will be a folder named rawReads with fastq files sorted according to sample names. There will also be a sample_names.txt file with a list of sample names, one per line. 
+
+2\. Using the command *--run step2_qc_and_trimming*, the main script will read the analysis_info_file, the sample_names files and run fastqc, create a folder Report/figure/rawQC with plots, create a folder Report/figure/data with tables, run trim galore, run fastqc on the trimmed reads, and create a folder Report/figure/trimmedQC with plots:
+```bash
+$ python bin/runMethylationAnalysis.py --run step2_qc_and_trimming
+```
 
 
-2\. Next run bcl2fastq.py. This script will run bcl2fastq with the information given in analysis_info.txt. By default, the script finds analysis_info.txt in the current directory. However, if the file has a different name you will need to specify it adding '--analysis_info_file whatever_name.txt'. Use the '-h' argument for details.  
+
+
+
+
+2\. Next run . This script will run bcl2fastq with the information given in analysis_info.txt. By default, the script finds analysis_info.txt in the current directory. However, if the file has a different name you will need to specify it adding '--analysis_info_file whatever_name.txt'. Use the '-h' argument for details.  
 ```bash
  $ python bin/run_bcl2fastq.py 
 ```

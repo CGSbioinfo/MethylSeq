@@ -35,7 +35,7 @@ if __name__ == '__main__':
     parser.add_argument('--analysis_info_file', help='Text file with details of the analysis. Default=analysis_info.txt', default='analysis_info.txt')
     parser.add_argument('--in_dir', help='Path to folder containing fastq files. Default=rawReads/', default='rawReads')
     #parser.add_argument('--out_dir', help='Path to out put folder. Default=rawReads/', default='rawReads')
-    parser.add_argument('--readType', help='Read Type: pairedEnd or singleEnd. Default=pairedEnd', default='pairedEnd')
+    #parser.add_argument('--readType', help='Read Type: pairedEnd or singleEnd. Default=pairedEnd', default='pairedEnd')
     parser.add_argument('--out_dir_report', help='Path to out put folder. Default=Report/figure', default='Report/figure')
     parser.add_argument('--suffix_name', help='Suffix to optionally put to the output name. Default=', default='_plot')
     parser.add_argument('--sample_names_file', help='Text file with sample names. Default=sample_names.txt', default='sample_names.txt')
@@ -50,13 +50,14 @@ if __name__ == '__main__':
     ncores=int(args.ncores)
 
     # Read sample names text file
+    ai=functions.read_analysis_info_file(args.analysis_info_file)
     sample_names_file=args.sample_names_file
     sampleNames = functions.read_sample_names(sample_names_file)
 
     # Set input and output directories if not 'rawReads/'
     in_dir=path + '/' + args.in_dir
     out_dir_report=path + '/' + args.out_dir_report
-    readType=args.readType
+    readType=ai['readType']
     suffix_name=args.suffix_name
     
     # Create tables

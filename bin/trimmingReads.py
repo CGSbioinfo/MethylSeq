@@ -39,15 +39,17 @@ if __name__ == '__main__':
     parser.add_argument('--out_dir', help='Path to out put folder. Default=trimmedReads/', default='trimmedReads/')
     parser.add_argument('--out_dir_report', help='Path to out put folder. Default=Report/figure/data/', default='Report/figure/data/')
     parser.add_argument('--sample_names_file', help='Text file with sample names. Default=sample_names_info.txt', default='sample_names.txt')
-    parser.add_argument('--ncores', help='Number of cores to use. Default=8', default='8')
+    #parser.add_argument('--ncores', help='Number of cores to use. Default=8', default='8')
     args=parser.parse_args()
 
     #path=functions.read_analysis_info_file(params_file)['Working directory']
     path=os.getcwd()
     os.chdir(path)
-    
+    ai=functions.read_analysis_info_file(args.analysis_info_file)    
+
     #Ncores
-    ncores=int(args.ncores)
+    #ncores=int(args.ncores)
+    ncores=int(ai['ncores'])
 
     # Read sample names text file
     sample_names_file=args.sample_names_file
