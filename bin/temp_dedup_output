@@ -1,0 +1,34 @@
+library(ggplot2)
+library(reshape)
+
+in_dir=commandArgs(TRUE)[1]
+sample_names=commandArgs(TRUE)[2]
+pattern=commandArgs(TRUE)[3]
+outdir=commandArs(TRUE)[4]
+
+dir.create(outdir,showWarnings=FALSE)
+
+allFiles=list.files(in_dir, recursive=TRUE, pattern=pattern)
+sample_names=as.character(read.csv(sample_names, header=FALSE)[,1])
+
+data_dups=data.frame(matrix(ncol=3))
+colnames(data_dups)=c("Total number of alignments analysed","Total number duplicated alignments removed","Total count of deduplicated leftover sequences"
+)
+
+for (i in 1:length(sample_names)) { 
+	x=readLines(grep(sample_names[i], allFiles, value=TRUE))
+	x=x[!x=='']
+	x=x[-grep('^Duplicated alignments were found',x)]
+	x=gsub('\t','',x)
+	x=as.data.frame((strsplit(x,':')))
+	colnames(x)=x[1,]
+	x=apply(x,2,as.character)
+	x[1,1]=gsub('analysed in .*$','analysed',x[1,1])
+	colnames(x)=x[1,]
+	x=x[-1,]
+
+	data_dups=rbind(data_dups,x)
+}
+data_dups=data_dups[-1,]
+rownames(data_dups)=sample_names
+write.csv(data_dups,paste0(outdir,'/deduplication_report.csv'))
