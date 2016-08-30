@@ -26,9 +26,10 @@ if __name__ == '__main__':
 	# Analysis information
 	parser.add_argument('--analysis_info_file', help='Text file with details of the analysis. Default=analysis_info.txt', default='analysis_info.txt')
 	parser.add_argument('--sample_names_file', help='File with sample names. Default=sample_names.txt', default='sample_names.txt')
+	#parser.add_argument('--ncores', help='Number of cores to use. Default=8', default='8')
 
 	# Choose a section of the pipeline to run
-	parser.add_argument('--run', help='Choose a section of the pipeline to run. Possible options: step1_prepare_analysis, step2_qc_and_trimming', default='')
+	parser.add_argument('--run', help='Choose a section of the pipeline to run. Possible options: step1_prepare_analysis, step2_qc_and_trimming, step3_mapping_and_deduplication', default='')
 
 	# Parse arguments
 	args=parser.parse_args()
@@ -64,6 +65,18 @@ if __name__ == '__main__':
 		print "Creating plots and tables trimmed data"
 		os.system("python bin/fastqc_tables_and_plots.py --in_dir trimmedReads/ --out_dir trimmedReads/ --suffix_name _trimmed --out_dir_report Report/figure/trimmedQC --plot_device pdf")
 		print "Finished plots and tables trimmed data"
+
+	if args.run == 'step3_mapping_and_deduplication':
+		print "Running mapping"
+		os.system("python bin/mappingReads.py --run bismark_alignment " + "--analysis_info_file " + args.analysis_info_file + " --sample_names_file " + args.sample_names_file)
+		print "Finished mapping"
+
+		print "Running deduplication"
+		os.system("python bin/mappingReads.py --run deduplicate_bismark " + "--analysis_info_file " + args.analysis_info_file + " --sample_names_file " + args.sample_names_file)
+		print "Finished deduplication"
+
+
+
 
 
 

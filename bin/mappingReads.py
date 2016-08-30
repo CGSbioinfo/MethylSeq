@@ -49,7 +49,7 @@ if __name__ == '__main__':
     parser.add_argument('--in_dir', help='Path to folder containing trimmed fastq files. Default=trimmedReads/', default='trimmedReads/')
     parser.add_argument('--out_dir', help='Path to out put folder. Default=alignedReads/', default='alignedReads/')
     parser.add_argument('--sample_names_file', help='Text file with sample names. Default=sample_names.txt', default='sample_names.txt')
-    parser.add_argument('--ncores', help='Number of cores to use. Default=8', default='8')
+    parser.add_argument('--ncores', help='Number of cores to use. Default=3', default='3')
     parser.add_argument('--run', help='Choose a section of the script to run. Possible options: bismark_alignment; deduplicate_bismark; all. Default=all', default='all')
     args=parser.parse_args()
 
