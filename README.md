@@ -57,8 +57,8 @@ At this point you should have a directory where you will do the analysis and a b
 
 #### Providing information about the analysis and setting up a working directory.
 
-1) Run the analysis_info.py script
- $ python bin/analysis_info.py
+1. Run the analysis_info.py script  
+ $ python bin/analysis_info.py  
 
 A file named 'analysis_info.txt' will be created in the folder. Open it in a text editor or vi and fill it. For example: 
 >Working directory = /mnt/cgs-fs2/Bioinfo_pipeline/MethylSeq/test/aug2016/heroG/   
@@ -67,7 +67,7 @@ A file named 'analysis_info.txt' will be created in the folder. Open it in a tex
 >bcl2fastq_output = /mnt/cgs-fs2/Bioinfo_pipeline/MethylSeq/test/aug2016/heroG/fastq/  
 
 
-2) Next run bcl2fastq.py. This script will run bcl2fastq with the information given in analysis_info.txt. By default, the script finds analysis_info.txt in the current directory. However, if the file has a different name you will need to specify it adding '--analysis_info_file whatever_name.txt'. Use the '-h' argument for details.  
+2. Next run bcl2fastq.py. This script will run bcl2fastq with the information given in analysis_info.txt. By default, the script finds analysis_info.txt in the current directory. However, if the file has a different name you will need to specify it adding '--analysis_info_file whatever_name.txt'. Use the '-h' argument for details.  
 ```bash
  $ python bin/run_bcl2fastq.py 
 ```
