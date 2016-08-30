@@ -15,7 +15,7 @@ Important note: All the main python scripts have a help page, so if unsure on ho
  $ analysis_info.py -h
 ```
 
-#### Setting up the analysis
+#### Starting an analysis and downloading the scripts.
 1) Go to your home folder. For example:
 ```bash
  $ cd /mnt/research/mjg225/
@@ -53,7 +53,9 @@ At this point you should have a directory where you will do the analysis and a b
 
 
 --------------------------------------------------------------------------------------------------------------------
-____________________________________________________________________________________________________________________
+--------------------------------------------------------------------------------------------------------------------
+
+#### Providing information about the analysis and setting up a working directory.
 
 7. Run the analysis_info.py script
 ```bash
