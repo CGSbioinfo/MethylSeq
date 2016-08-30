@@ -57,7 +57,7 @@ At this point you should have a directory where you will do the analysis and a b
 
 #### Providing information about the analysis, creating fastq files and setting up a working directory.
 
-1) Run the analysis_info.py script  
+1\. Run the analysis_info.py script  
 **$ python bin/analysis_info.py**  
 
 A file named 'analysis_info.txt' will be created in the folder. Open it in a text editor or vi and fill it. For example: 
@@ -71,7 +71,7 @@ A file named 'analysis_info.txt' will be created in the folder. Open it in a tex
 >target_regions_bed =  
 
 Explanation of 'analysis_info.txt':
->Working directory = *<path to directory of the analysis>*  
+>Working directory = *\<path to directory of the analysis\>*  
 >run_folder = *path to the run folder*  
 >run_samplesheet = *sample sheet used to generate fastq files. This is created using the Illumina Expert Manager*  
 >bcl2fastq_output = *path to the desired output of bcl2fastq. The defaults is fastq/ and the folder will be created automatically*  
@@ -81,7 +81,7 @@ Explanation of 'analysis_info.txt':
 >target_regions_bed = *path to bedfile*  
 
 
-2) Next run bcl2fastq.py. This script will run bcl2fastq with the information given in analysis_info.txt. By default, the script finds analysis_info.txt in the current directory. However, if the file has a different name you will need to specify it adding '--analysis_info_file whatever_name.txt'. Use the '-h' argument for details.  
+2\. Next run bcl2fastq.py. This script will run bcl2fastq with the information given in analysis_info.txt. By default, the script finds analysis_info.txt in the current directory. However, if the file has a different name you will need to specify it adding '--analysis_info_file whatever_name.txt'. Use the '-h' argument for details.  
  $ python bin/run_bcl2fastq.py 
 
 9. Create sample_names.txt file. The following command will create a sample_names.txt file with the sample names of the project based on the fastq files that exist in the output from the run_bcl2fastq.py (previous step). You can also specify a different '--in_dir ' argument.
