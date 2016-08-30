@@ -51,6 +51,10 @@ A folder named "MethylSeq-master" should appear. Check by just typing ls.
 
 At this point you should have a directory where you will do the analysis and a bin/ folder in such directory with the analysis scripts copied from the github download.
 
+
+--------------------------------------------------------------------------------------------------------------------
+____________________________________________________________________________________________________________________
+
 7. Run the analysis_info.py script
 ```bash
  $ python bin/analysis_info.py
