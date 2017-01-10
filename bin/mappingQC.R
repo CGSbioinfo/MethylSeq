@@ -6,6 +6,10 @@ sample_names=commandArgs(TRUE)[2]
 pattern=commandArgs(TRUE)[3]
 outdir=commandArgs(TRUE)[4]
 
+# Create outdir
+dir.create(outdir, recursive=TRUE, showWarning=FALSE)
+
+# Read data
 allFiles=list.files(in_dir, recursive=TRUE, pattern=pattern)
 sample_names=as.character(read.csv(sample_names, header=FALSE)[,1])
 
