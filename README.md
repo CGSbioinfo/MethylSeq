@@ -125,10 +125,10 @@ $ python bin/runMethylationAnalysis.py --run step3_mapping_and_deduplication.
 ```
 
 ### Step 4
-Bismark outputs a bam file with the mapped reads and a report about the alignment. 
-4\. The following command uses an executable Rscript which summarises mapping QC metrics 
+4\. Bismark outputs a bam file with the mapped reads and a report about the alignment.    
+The following command uses an executable Rscript which summarises mapping QC metrics 
 
->Arguments   
+Arguments:   
 >Rscript bin/mappingQC.R *\<input folder containing bam files*\> *\<sample names file*\> *\<suffix pattern of report files output of bismark*\> *\<outdir*\>   
 
 ```bash
