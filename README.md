@@ -87,7 +87,7 @@ Explanation of 'analysis_info.txt':
 >run_folder = *\<path to the run folder\>*  
 >run_samplesheet = *\<sample sheet used to generate fastq files. This is created using the Illumina Expert Manager\>*  
 >bcl2fastq_output = *\<path to the desired output of bcl2fastq. The defaults is fastq/ and the folder will be created automatically\>*  
->readType = *\<either pairedEnd or singleEnd\>*
+>readType = *\<either pairedEnd or singleEnd\>*  
 >reference_genome = *\<path to the bismark reference genome that will be used at the mapping step\>*  
 >bismark_params = *\<parameters passed to the bismark script. Leave the default, and you can add additional parameters separated by ";"\>*  
 >methyl_extract_params= *\<parameters passed to the methyl extractor script. Leave the default, and you can add additional parameters separated by ";"\>*  
@@ -129,7 +129,7 @@ Bismark outputs a bam file with the mapped reads and a report about the alignmen
 4\. The following command uses an executable Rscript which summarises mapping QC metrics 
 
 >Arguments   
->Rscript bin/mappingQC.R *\<input folder containing bam files*\> *\<sample names file*\> *\<suffix pattern of report files output of bismark*\> *\<outdir*\>
+>Rscript bin/mappingQC.R *\<input folder containing bam files*\> *\<sample names file*\> *\<suffix pattern of report files output of bismark*\> *\<outdir*\>   
 
 ```bash
 $ Rscript bin/mappingQC.R /mnt/research/jb393/MethylSeq_Pilot/Aligned_data/Raw_bam/ sample_names_all.txt _bismark_bt2_PE_report.txt Report/figure/mappingQC/
