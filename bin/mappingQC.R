@@ -102,17 +102,19 @@ data_aligned_pairs_pct=apply(as.matrix(data_aligned_pairs),2,as.numeric)/total*1
 rownames(data_aligned_pairs_pct)=rownames(data_aligned_pairs)
 
 plot_data=cbind(data_aligned_pairs_pct,Mapping_effiency=as.numeric(gsub('%','',data_alignment[,which(colnames(data_alignment)=='Mapping efficiency:')])))
+colnames(plot_data)=c('converted\ntop strand','complementary\nto converted\ntop strand','complementary\nto converted\nbottom strand','converted\nbottom strand','Mapping_effiency')
 melt_plot_data=melt(plot_data)
 melt_plot_data$layer='Sequence pairs with unique best alignment'
 melt_plot_data$layer[melt_plot_data$X2=='Mapping_effiency']='Mapping effiency'
-#ggplot(melt_plot_data,aes(x=X1,y=value,col=X2)) + geom_point() + facet_wrap(~layer) + theme(axis.text=element_text(angle=90))
+melt_plot_data[melt_plot_data$layer=='Sequence pairs with unique best alignment',]$layer='Directionality'
 pdf(paste0(outdir,'/mappingQC_efficiency_and_strand.pdf'),width=12)
-ggplot(melt_plot_data,aes(x=X1,y=value,col=X2)) + geom_point() + facet_wrap(~layer) + theme(legend.title=element_blank(),axis.text.x=element_text(angle=90)) + xlab('Sample') + ylab('Percentage')
+ggplot(melt_plot_data,aes(x=X1,y=value,col=X2)) + geom_point(size=3) + facet_wrap(~layer) + theme_bw()  + theme(panel.grid.major=element_line(colour='#000000',linetype='dashed'), legend.title=element_blank(),axis.text.x=element_blank(), axis.text=element_text(size=20), axis.title=element_text(size=20), legend.text=element_text(size=20), strip.text=element_text(size=20), legend.position='bottom') + xlab('Sample') + ylab('Percentage')
 dev.off()
+
 
 # Methylated C's plot 1 
 plot_data=data_methylation[,-grep('%',data_methylation)]
-plot_data=data.frame(apply(plot_data,2,as.numeric), row.names=rownames(plot_data))
+plot_data=data.frame(suppressWarnings(apply(plot_data,2,as.numeric)), row.names=rownames(plot_data))
 all_cs=data.frame(matrix(0,ncol=4,nrow=nrow(plot_data)))
 context=c('CpG.context','CHG.context','CHH.context','Unknown.context')
 colnames(all_cs)=context
@@ -142,7 +144,8 @@ melt_plot_data$X2[melt_plot_data$X2=='C methylated in unknown context (CN or CHN
 
 p=ggplot(melt_plot_data,aes(x=X1,y=value,col=X2)) + geom_point() + theme(axis.text.x=element_text(angle=90), legend.position='none') + xlab('Sample') + ylab('Percentage of methylated C\'s') + facet_wrap(~X2)
 ggsave(p,filename=paste0(outdir,'/mappingQC_methC.pdf'), width=12)
-
+melt_plot_data=melt_plot_data[melt_plot_data$X2=='CpG context  (9-11%)',]
+p=ggplot(melt_plot_data,aes(x=X1,y=value)) + geom_point(size=3) + theme_bw() + theme(panel.grid.major=element_line(linetype='dashed',colour='grey'),axis.text.y=element_text(size=22), axis.title=element_text(size=22),legend.position='none', axis.text.x=element_blank()) + xlab('Sample') + ylab('Percentage of methylated C\'s') + ylim(0,100)
 
 
 
