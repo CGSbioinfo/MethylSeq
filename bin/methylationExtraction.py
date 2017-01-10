@@ -23,7 +23,7 @@ def methylationExtraction(i, ai):
     if args.dedup == True:
         bamFile = in_dir + [alignedReads[y] for y, x in enumerate(alignedReads) if re.findall("bismark_bt2_.*deduplicated.bam$", x)][0]
     else:
-        bamFile = in_dir + [alignedReads[y] for y, x in enumerate(alignedReads) if re.findall("val_1.fq_bismark_bt2_pe.bam$", x)][0]
+        bamFile = in_dir + [alignedReads[y] for y, x in enumerate(alignedReads) if re.findall("val_1_bismark_bt2_pe.bam$", x)][0]
     os.system("bismark_methylation_extractor  " + params + " --output " + out_dir + " " + bamFile + " &>" + out_dir + "/methylExtract_log_"+i+".txt")
 
 
@@ -33,7 +33,7 @@ __version__='v01'
 # created 18/08/2016
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(prog='trimmingReads.py',description = 'QC and adapter trimming using Trim Galore')
+    parser = argparse.ArgumentParser(prog='methylationExtraction.py',description = 'Methylation extraction from bamfiles.')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s-'+__version__)
     parser.add_argument('--analysis_info_file', help='Text file with details of the analysis. Default=analysis_info.txt', default='analysis_info.txt')
     parser.add_argument('--in_dir', help='Path to folder containing trimmed fastq files. Default=alignedReads/', default='alignedReads/')

@@ -138,7 +138,7 @@ $ Rscript bin/mappingQC.R /mnt/research/jb393/MethylSeq_Pilot/Aligned_data/Raw_b
 
 
 ### Step 5
-5\. Run the methylation extraction
+5\. Run the methylation extraction   
  $ python bin/methylationExtraction.py
 
 ### Step 6
