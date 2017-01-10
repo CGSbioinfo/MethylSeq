@@ -21,12 +21,14 @@ def coverage(i, ai):
     alignedReads = os.listdir(in_dir)
     alignedReads = [alignedReads[y] for y, x in enumerate(alignedReads) if re.findall(i, x)]
     bamFile = in_dir + [alignedReads[y] for y, x in enumerate(alignedReads) if re.findall( "bismark_bt2_.*deduplicated.bam$", x)][0]
-    os.system("bedtools coverage -hist -abam " + bamFile + " -b " + bedfile + " > " + out_dir + "/" + i + "_coverage.hist.all.txt")
+    os.system("bedtools coverage -abam " + bamFile + " -b " + bedfile + " -d > " + out_dir + "/" + i + "_coverage_per_position.txt")
+    #os.system("grep all " + out_dir + "/" + i + "_coverage.txt > " + out_dir + "/" + i + "_coverage_all_hist.txt")
+    #os.system("grep -v all " + out_dir + "/" + i + "_coverage.txt > " + i + "_coverage_temp.txt && mv " + i + "_coverage_temp.txt " + out_dir + "/" + i + "_coverage.txt ")
 
 
 #########################
 
-__version__='v01'
+__version__='v01' 
 # created 24/08/2016
 
 if __name__ == '__main__':

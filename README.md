@@ -124,5 +124,21 @@ $ python bin/runMethylationAnalysis.py --run step2_qc_and_trimming
 $ python bin/runMethylationAnalysis.py --run step3_mapping_and_deduplication.
 ```
 
+### Step 4
+4\. The following command uses an Rscript executable which summarises mapping QC metrics 
+Rscript bin/mappingQC.R /mnt/research/jb393/MethylSeq_Pilot/Aligned_data/Raw_bam/ sample_names_all.txt _bismark_bt2_PE_report.txt Report/figure/mappingQC/
 
+### Step 5
+5\. Run the methylation extraction
+ $ python bin/methylationExtraction.py
 
+### Step 6
+6\. Run the mbias plot
+ $ Rscript bin/methylExtractQC_mbias_plot.R alignedReads/ sample_names.txt .M-bias.txt Report/figure/methExtractQC/
+
+### Step 7
+7\. Fill a file mbias_remove_bases.txt with information of the mbias plot
+
+### Step 8
+8\. Run the methyl extraction again, removing biased bases from reads with information in mbias_remove_bases.txt 
+ $ python bin/methylationExtraction_removeBases.py --ncores 1 --sample_names_file sample_names_test.txt --out_dir alignedReads/clean --remove_bases_file mbias_remove_bases.txt

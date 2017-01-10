@@ -1,0 +1,214 @@
+###################################################
+###################################################
+#      BISEQ Analysis pipeline
+###################################################
+###################################################
+
+
+library(GenomicRanges)
+library(rtracklayer)
+library(BiSeq)
+library(ggplot2)
+library(reshape)
+library(dplyr)
+
+########################
+# Arguments            #
+########################
+
+option_list = list(make_option(c("-s","--sampleInfoFile"), type="character", default=NULL, help="Sample information file", metavar="character"),
+                   make_option(c("-c", "--comparisonFile"), type="character", default=NULL, help="Comparisons file", metavar = "character"),
+                   make_option(c("-r", "--bedGraphDataFolder"), type="character", default=NULL, help="Folder containing the raw data (cels file)", metavar="character")
+                   make_option(c("-b", "--bedFile"), type="character", default=NULL, help="Pah to annotation file", metavar="character")
+)
+
+opt_parser=OptionParser(option_list = option_list)
+opt = parse_args(opt_parser)
+
+if (length(opt)<4){
+  print_help(opt_parser)
+  stop("All arguments must be supplied", call.=FALSE)
+}
+
+sampleInfoFile = opt$sampleInfoFile
+groupInfoFile = opt$comparisonFile
+bedGraphFolder = opt$bedGraphDataFolder
+annotationBedPath = opt$bedFile
+
+########################
+#      Data loading    #
+########################
+
+sampleInfo<- read.table(sampleInfoFile, sep="\t", header=T)
+listMethylFileName<-list.files(path=bedGraphFolder,pattern=".cov")
+methylSampleName<-strsplit(listMethylFileName, split="_R1.*")
+first=T
+for(i in (1:length(listMethylFileName))){
+  if(first){
+    first=F
+    sampleNameOrder<-methylSampleName[[i]][1]
+  }else{
+    sampleNameOrder<-c(sampleNameOrder,methylSampleName[[i]][1])
+  }
+}
+sampleInfo<-sampleInfo[match(sampleNameOrder, sampleInfo$Sample.Name),]
+listMethylFile<-list.files(path=bedGraphFolder,pattern=".cov",full.names = T)
+listMethylFileName<-list.files(path=bedGraphFolder, pattern=".cov")
+sample_names_table<-strsplit(listMethylFileName, split="_R1.*")
+first=T
+for(i in 1:length(listMethylFileName)){
+  if(first){
+    first=F
+    sample_name<-sample_names_table[[i]][1]
+  }else{
+    sample_name<-c(sample_name, sample_names_table[[i]][1])
+  }
+}
+sampleInfo<-sampleInfo[match(sample_name, sampleInfo$Sample.Name),]
+methylDataRaw<-readBismark(listMethylFile, as.character(sampleInfo$Sample.Name))
+methylDataRel<-rawToRel(methylDataRaw)
+
+
+#######################
+#     Annotation      #
+#######################
+
+annotation_cpg_bed<-import.bed(annotationBedPath)
+methylDataRaw.rc<-subsetByOverlaps(methylDataRaw, annotation_cpg_bed)
+methylDataRel.rc<-rawToRel(methylDataRaw.r)
+
+#####KIT ANNOTATION
+annotation_capture<-import.bed("../../../../Agilent/output_S03770311_Covered_grch38.bed")
+annotation_capture_df=as.data.frame(annotation_capture)
+name=paste(as.character(annotation_capture_df$seqnames), as.character(annotation_capture_df$start), as.character(annotation_capture_df$end),sep='_' )
+annotation_capture$name=name
+methylDataRaw.rk<-subsetByOverlaps(methylDataRaw, annotation_capture)
+
+
+#######################
+#     QC     WIP     #
+#######################
+l=0
+for(i in 1:(round(length(sampleInfo$Sample.Name)/5))){
+  k=l+1
+  if(i*5>length(sampleInfo$Sample.Name)){
+    l=length(sampleInfo$Sample.Name)
+  }else{
+    l=i*5
+  }
+  pdf(file=paste("boxplot_coverage_CPG_",i,".pdf"))
+  covBoxplots(methylDataRaw[,c(k:l)],las=2, ylim=c(1,100))
+  dev.off()
+}
+
+genomic_ranges_methyldata<-as.data.frame(rowRanges(methylDataRaw.rk))
+genomic_ranges_coverage<-cbind(genomic_ranges_methyldata, totalReads(methylDataRaw.rk))
+
+#####PLOT COVERAGE:
+
+colnames(test_chr21[,c(6:length(colnames(test_chr21)))])
+
+
+# Coverage in annotation vs coverage outside annotation #
+#-------------------------------------------------------#
+# Total coverage in annotation
+genomic_ranges_coverage_total<-data.frame(position=paste(genomic_ranges_coverage$seqnames,genomic_ranges_coverage$start, genomic_ranges_coverage$end,sep='_'), genomic_ranges_coverage[,-c(1:5)])
+in_kit_locations<-as.character(unique(genomic_ranges_coverage_total$position)) # get probes in kit for further reference
+genomic_ranges_coverage_total=genomic_ranges_coverage_total[apply(genomic_ranges_coverage_total[,-1]>0, 1, all),] # substet?
+genomic_ranges_coverage_total<-melt(genomic_ranges_coverage_total)
+genomic_ranges_coverage_total$location<-'In_kit_annotation'
+colnames(genomic_ranges_coverage_total)[3]<-'TotalCoverage'
+
+# Meth coverage in annotation
+#genomic_ranges_coverage_meth<-cbind(genomic_ranges_methyldata, methReads(methylDataRaw.rk))
+#genomic_ranges_coverage_meth<-data.frame(position=paste(genomic_ranges_coverage_meth$seqnames,genomic_ranges_coverage_meth$start, genomic_ranges_coverage_meth$end,sep='_'), genomic_ranges_coverage_meth[,-c(1:5)])
+#genomic_ranges_coverage_meth<-melt(genomic_ranges_coverage_meth)
+#genomic_ranges_coverage_meth$location<-'In_kit_annotation'
+#colnames(genomic_ranges_coverage_meth)[3]<-'MethylCoverage'
+
+# Both total and meth coverage in annotation
+#genomic_ranges_coverage_in_kit<-inner_join(genomic_ranges_coverage_total,genomic_ranges_coverage_meth, by=c('position','variable','location'))
+#genomic_ranges_coverage_in_kit<-melt(genomic_ranges_coverage_in_kit)
+#colnames(genomic_ranges_coverage_in_kit)<-c('position','sample','location','coverage','value')
+
+# Total coverage not in annotation
+#in_kit_locations<-as.character(unique(genomic_ranges_coverage_total$position))
+genomic_ranges_all<-as.data.frame(rowRanges(methylDataRaw))
+genomic_ranges_all$position<-paste(genomic_ranges_all$seqnames,genomic_ranges_all$start, genomic_ranges_all$end,sep='_')
+in_kit_locations<-which(genomic_ranges_all$position %in% in_kit_locations )
+methylDataRaw_not_in_kit<-methylDataRaw[-in_kit_locations]
+genomic_ranges_methyldata_nk<-as.data.frame(rowRanges(methylDataRaw_not_in_kit))
+genomic_ranges_coverage_nk<-cbind(genomic_ranges_methyldata_nk, totalReads(methylDataRaw_not_in_kit))
+genomic_ranges_coverage_total_nk<-data.frame(position=paste(genomic_ranges_coverage_nk$seqnames,genomic_ranges_coverage_nk$start, genomic_ranges_coverage_nk$end,sep='_'), genomic_ranges_coverage_nk[,-c(1:5)])
+genomic_ranges_coverage_total_nk=genomic_ranges_coverage_total_nk[apply(genomic_ranges_coverage_total_nk[,-1]>0, 1, all),] # substet?
+genomic_ranges_coverage_total_nk<-melt(genomic_ranges_coverage_total_nk)
+genomic_ranges_coverage_total_nk$location<-'Not_In_kit_annotation'
+colnames(genomic_ranges_coverage_total_nk)[3]<-'TotalCoverage'
+
+# Meth coverage not in annotation
+#genomic_ranges_coverage_meth_nk<-cbind(genomic_ranges_methyldata_nk, methReads(methylDataRaw_not_in_kit))
+#genomic_ranges_coverage_meth_nk<-data.frame(position=paste(genomic_ranges_coverage_meth_nk$seqnames,genomic_ranges_coverage_meth_nk$start, genomic_ranges_coverage_meth_nk$end,sep='_'), genomic_ranges_coverage_meth_nk[,-c(1:5)])
+#genomic_ranges_coverage_meth_nk<-melt(genomic_ranges_coverage_meth_nk)
+#genomic_ranges_coverage_meth_nk$location='Not_In_kit_annotation'
+#colnames(genomic_ranges_coverage_meth_nk)[3]='MethylCoverage'
+
+# Both total and meth coverage not in annotation
+#genomic_ranges_coverage_not_in_kit=inner_join(genomic_ranges_coverage_total_nk,genomic_ranges_coverage_meth_nk, by=c('position','variable','location'))
+#genomic_ranges_coverage_not_in_kit=melt(genomic_ranges_coverage_not_in_kit)
+#colnames(genomic_ranges_coverage_not_in_kit)=c('position','sample','location','coverage','value')
+
+# Both
+#genomic_ranges_coverage=rbind(genomic_ranges_coverage_in_kit,genomic_ranges_coverage_not_in_kit)
+genomic_ranges_coverage=rbind(genomic_ranges_coverage_total,genomic_ranges_coverage_total_nk) # just include the total and not include meth coverage
+genomic_ranges_coverage=melt(genomic_ranges_coverage)
+colnames(genomic_ranges_coverage)[2]='sample'
+colnames(genomic_ranges_coverage)[4]='coverage'
+
+
+
+png('test_plot2.png', width = 880, height = 480)
+ggplot(genomic_ranges_coverage, aes(x=location, y=log2(value+0.1), color=sample)) + geom_boxplot() + facet_wrap(~coverage) + theme(axis.text.x=element_text(angle=90))
+dev.off()
+
+# Covered by n reads
+#function
+count_vals=function(x,y,z,max=FALSE){
+        if(max==TRUE){
+                tab=table(x>=y)['TRUE']
+        } else if (z!=y){
+                tab=table(x>=y & x<=z)['TRUE']
+        } else {
+                tab=table(x==y)['TRUE']
+        }
+        return(tab)
+        }
+
+N0=as.data.frame(genomic_ranges_coverage %>% group_by(sample, location, coverage) %>% summarise(zero=count_vals(value,0,0), one=count_vals(value,1,1), two=count_vals(value,2,2), threeToFive=count_vals(value,3,5), sixToTen=count_vals(value,6,10), elevenToOnehundred=count_vals(value,11,100), onehundredoneToFivehundred=count_vals(value,101,500), moreThanFivehundred=count_vals(value,501,max=TRUE)))
+N0.melt=melt(N0)
+ggplot(N0.melt,aes(x=variable,y=value,fill=sample)) + geom_bar(stat='identity', position=position_dodge()) + facet_wrap(~location) + theme(axis.text.x=element_text(angle=90))
+
+
+#totalReads_subset<-colSums(totalReads(methylDataRaw.rk))
+#totalReads_all<-colSums(totalReads(methylDataRaw))
+#total_reads_subset_all<-data.frame(melt(totalReads_subset), melt(totalReads_all))
+#colnames(total_reads_subset_all)<-c('In_kit_annotation','Not_in_kit_annotation')
+#total_reads_subset_all<-data.frame(Sample=rownames(total_reads_subset_all),total_reads_subset_all)
+#proportion_in_kit<-data.frame(Sample=rownames(total_reads_subset_all),CoverageProportionInKit=round(total_reads_subset_all$In_kit_annotation/total_reads_subset_all$Not_in_kit_annotation, digits=4))
+#names=as.data.frame(annotation_capture[subjectHits(findOverlaps(rowRanges(methylDataRaw.rk),annotation_capture))])$name
+#genomic_ranges_coverage=data.frame(names,genomic_ranges_coverage)
+
+#######################
+#     Define clusters #
+#######################
+
+cluster.rk<-clusterSites(methylDataRaw.rk, perc.samples=.5, min.sites = 20, max.dist = 100)
+cluser.rk.GR<-clusterSitesToGR(cluster.rk)
+####Plot coverage accross clusters? YES
+
+##Filtering highly covered region to avoid bias due to high weights
+ind.cov<-totalReads(cluster.rk)>0
+ninety_quant<-quantile(totalReads(cluster.rk)[ind.cov],0.9)
+cluster.rk.f<-limitCov(cluster.rk, maxCov = ninety_quant)
+
+###Smoothing methylation (will take some time!)
+predictedMeth<-predictMeth(cluster.rk.f, mc.cores=10)
