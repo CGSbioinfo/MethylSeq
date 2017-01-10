@@ -125,8 +125,11 @@ $ python bin/runMethylationAnalysis.py --run step3_mapping_and_deduplication.
 ```
 
 ### Step 4
-4\. The following command uses an Rscript executable which summarises mapping QC metrics 
+4\. The following command uses an executable Rscript which summarises mapping QC metrics 
+```bash
 Rscript bin/mappingQC.R /mnt/research/jb393/MethylSeq_Pilot/Aligned_data/Raw_bam/ sample_names_all.txt _bismark_bt2_PE_report.txt Report/figure/mappingQC/
+```
+
 
 ### Step 5
 5\. Run the methylation extraction
