@@ -142,9 +142,9 @@ $ Rscript bin/mappingQC.R /mnt/research/jb393/MethylSeq_Pilot/Aligned_data/Raw_b
 ```bash 
  $ python bin/methylationExtraction.py
 ```
-This creates 3 output files per sample: bedGraph.gz, bismark.cov.gz, and M-bias.txt. 
-There is also a log file per sample: methylExtract_log_sampleName.txt
-The M-bias.txt sample will be used in the next step to detect any bias in the %Methylation across the reads"'" positions.  
+This creates 3 output files per sample: bedGraph.gz, bismark.cov.gz, and M-bias.txt.   
+There is also a log file per sample: methylExtract_log_sampleName.txt.   
+The M-bias.txt sample will be used in the next step to detect any bias in the %Methylation across the reads"'" positions.     
 
 
 ### Step 6
