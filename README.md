@@ -148,18 +148,32 @@ The M-bias.txt sample will be used in the next step to detect any bias in the %M
 
 
 ### Step 6
-6\. Run the mbias plot
+6\. Run the mbias plot   
 Arguments:
 >Rscript bin/methylExtractQC_mbias_plot.R *\<input folder containing .M-bias.txt files*\> *\<sample names file*\> *\<suffix pattern of M-bias.txt output of bismark*\> *\<outdir*\>
 
 ```bash
  $ Rscript bin/methylExtractQC_mbias_plot.R alignedReads/ sample_names.txt .M-bias.txt Report/figure/methExtractQC/
 ```
+This creates a plot in the specified outdir with the %Methylation across reads"'" positions.   
+Based on this plot, we need to decide whether or not to trim bases from 5p and 3p for each sample. 
 
 
 
 ### Step 7
-7\. Fill a file mbias_remove_bases.txt with information of the mbias plot
+7\. Create and fill a file mbias_remove_bases.txt with information about which bases to clip fromr eads
+Arguments:
+>python bin/remove_bases_file_info.py --outfile *\<name of output txt file*\>
+```bash
+ $ python bin/remove_bases_file_info.py --outfile remove_bases.txt
+```
+A file with the specified name will be creates. Open the file and fill it with the following information (one sample per line):
+>sample: *\<sample name*\>   
+>5R1: *\<number of bases to clip from the 5 prime end from read 1 (forward read)*\>  
+>3R1: *\<number of bases to clip from the 3 prime end from read 1 (reverse read)*\>   
+>5R2: *\<number of bases to clip from the 5 prime end from read 2 (forward read)*\>   
+>3R2: *\<number of bases to clip from the 3 prime end from read 2 (reverse read)*\>   
+
 
 ### Step 8
 8\. Run the methyl extraction again, removing biased bases from reads with information in mbias_remove_bases.txt 
