@@ -161,7 +161,7 @@ Based on this plot, we need to decide whether or not to trim bases from 5p and 3
 
 
 ### Step 7
-7\. Create and fill a file mbias_remove_bases.txt with information about which bases to clip fromr eads
+7\. Create and fill a file *mbias_remove_bases.txt* with information about which bases to clip from reads.   
 Arguments:
 >python bin/remove_bases_file_info.py --outfile *\<name of output txt file*\>
 ```bash
