@@ -37,11 +37,11 @@ __version__='v01'
 # created 18/08/2016
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(prog='trimmingReads.py',description = 'QC and adapter trimming using Trim Galore')
+    parser = argparse.ArgumentParser(prog='methylationExtraction_removeBases.py',description = 'Methylation extraction disregarding specified bases.')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s-'+__version__)
     parser.add_argument('--analysis_info_file', help='Text file with details of the analysis. Default=analysis_info.txt', default='analysis_info.txt')
-    parser.add_argument('--in_dir', help='Path to folder containing trimmed fastq files. Default=alignedReads/', default='alignedReads/')
-    parser.add_argument('--out_dir', help='Path to out put folder. Default=alignedReads/', default='alignedReads/')
+    parser.add_argument('--in_dir', help='Path to folder containing bam files. Default=alignedReads/', default='alignedReads/')
+    parser.add_argument('--out_dir', help='Path to out put folder. Default=alignedReads/clipped', default='alignedReads/clipped/')
     parser.add_argument('--sample_names_file', help='Text file with sample names. Default=sample_names.txt', default='sample_names.txt')
     parser.add_argument('--dedup', action='store_true')
     parser.add_argument('--ncores', help='Number of cores to use. Default=8', default='8')
