@@ -196,4 +196,12 @@ Confirm that the clipping of bases worked:
  $ Rscript bin/methylExtractQC_mbias_plot.R alignedReads/clipped/ sample_names.txt .M-bias.txt Report/figure/methExtractQC/Mbias_plot_clipped.pdf
 ```
 
+***
+***
+***
+
+## Part 2: Analysing the data in R
+
+### Step 1: check the coverage in target regions
+
 
