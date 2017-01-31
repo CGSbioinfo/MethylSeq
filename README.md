@@ -202,6 +202,11 @@ Confirm that the clipping of bases worked:
 
 ## Part 2: Analysing the data in R
 
-### Step 1: check the coverage in target regions
+### Step 1: Check the coverage in target regions
+Script: bin/coverage_methExtractedData.R
+
+Arguments:
+>/usr/bin/Rscript bin/coverage_methExtractedData.R *\<sample_details.txt file*\> *\<folder containing bedgraph files (full path)*\> *\<output plot name: coverage whole genome*\> *\<output plot name: coverage in target regions*\> *\<bed file with annotation of target regions*\>
+
 
 
