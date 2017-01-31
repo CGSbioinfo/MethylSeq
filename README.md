@@ -208,5 +208,10 @@ Script: bin/coverage_methExtractedData.R
 Arguments:
 >/usr/bin/Rscript bin/coverage_methExtractedData.R *\<sample_details.txt file*\> *\<folder containing bedgraph files (full path)*\> *\<output plot name: coverage whole genome*\> *\<output plot name: coverage in target regions*\> *\<bed file with annotation of target regions*\>
 
+Example:
+```bash
+ $ /usr/bin/Rscript bin/coverage_methExtractedData.R /mnt/research/jb393/MethylSeq_Pilot/Aligned_data/Raw_bam/methylationExtraction_clean/ Report/figure/methExtractQC/coverage_rawData_wg.pdf Report/figure/methExtractQC/coverage_rawData_tr.pdf /mnt/research/jb393/MethylSeq_Pilot/Kit_annotation/S03770311_Covered_GR38.bed
+```
+
 
 
