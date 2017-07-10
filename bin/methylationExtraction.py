@@ -20,11 +20,21 @@ def methylationExtraction(i, ai):
     params=ai['methyl_extract_params'].replace(';','')
     alignedReads = os.listdir(in_dir + "/")
     alignedReads = [alignedReads[y] for y, x in enumerate(alignedReads) if re.findall(i, x)]
+    if not alignedReads:
+        print "No aligned reads found for %s." % sampleName
+        return
+    
     if args.dedup == True:
         bamFile = in_dir + [alignedReads[y] for y, x in enumerate(alignedReads) if re.findall("bismark_bt2_.*deduplicated.bam$", x)][0]
     else:
         bamFile = in_dir + [alignedReads[y] for y, x in enumerate(alignedReads) if re.findall("val_1_bismark_bt2_pe.bam$", x)][0]
-    os.system("bismark_methylation_extractor  " + params + " --output " + out_dir + " " + bamFile + " &>" + out_dir + "/methylExtract_log_"+i+".txt")
+
+    if not bamFiles:
+        print "No bam file found for %s." % sampleName
+        return
+
+    cmdStr = "srun -c "+ncores+" bismark_methylation_extractor  " + params + " --output " + out_dir + " " + bamFile + " &>" + out_dir + "/methylExtract_log_"+i+".txt"
+    functions.runAndCheck(cmdStr, "Error deduplicating")
 
 
 #########################
@@ -48,7 +58,8 @@ if __name__ == '__main__':
     path=os.getcwd()
 
     #Ncores
-    ncores=int(args.ncores)
+    ncores=int(ai['ncores'])
+    ninstances=int(ai['ninstances'])
 
     # Read sample names text file
     sample_names_file=args.sample_names_file
@@ -59,9 +70,9 @@ if __name__ == '__main__':
     out_dir= args.out_dir
 
     # Detect if files are gz
-    gz = functions.check_gz(in_dir)
+    gz = functions.check_gz(in_dir, "fq")
 
     # Run bismark alignment
     functions.make_sure_path_exists(out_dir)
-    Parallel(n_jobs=ncores)(delayed(methylationExtraction)(i,ai) for i in sampleNames)
+    Parallel(n_jobs=ninstances)(delayed(methylationExtraction)(i,ai) for i in sampleNames)
 

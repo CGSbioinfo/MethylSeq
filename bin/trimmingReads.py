@@ -11,7 +11,6 @@ import logging
 from joblib import Parallel, delayed
 import multiprocessing
 import subprocess
-#sys.path.insert(0,'/usr/local/bin/')
 import functions
 import argparse
 
@@ -19,11 +18,11 @@ def trimming(i):
     allFiles = os.listdir(in_dir + "/" + i )
     pairedReads_temp = [allFiles[y] for y, x in enumerate(allFiles) if re.findall("_R2", x)]
     if pairedReads_temp:
-        os.system("trim_galore --gzip --paired --fastqc --fastqc_args '--nogroup --extract' --output_dir " + out_dir + " " + 
+        functions.runAndCheck("srun -c "+ncores+" trim_galore --gzip --paired --fastqc --fastqc_args '--nogroup --extract' --output_dir " + out_dir + " " + 
             in_dir + i + "/" + i + "*_R1*.fastq" + gz + " " + 
-            in_dir + i + "/" + i + "*_R2*.fastq" + gz)
+            in_dir + i + "/" + i + "*_R2*.fastq" + gz, "Error in trim_galore")
     else:
-        os.system("trim_galore --gzip --fastqc --fastqc_args '--nogroup --extract' --output_dir " + out_dir + " " + in_dir + i + "/" + i + "*_R1*.fastq" + gz)
+        functions.runAndCheck("srun -c "+ncores+" trim_galore --gzip --fastqc --fastqc_args '--nogroup --extract' --output_dir " + out_dir + " " + in_dir + i + "/" + i + "*_R1*.fastq" + gz, "Error in trim_galore")
 
 
 #########################
@@ -32,13 +31,26 @@ __version__='v01'
 # created 18/08/2016
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(prog='trimmingReads.py',description = 'QC and adapter trimming using Trim Galore')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s-'+__version__)
-    parser.add_argument('--analysis_info_file', help='Text file with details of the analysis. Default=analysis_info.txt', default='analysis_info.txt')
-    parser.add_argument('--in_dir', help='Path to folder containing fastq files. Default=rawReads/', default='rawReads/')
-    parser.add_argument('--out_dir', help='Path to out put folder. Default=trimmedReads/', default='trimmedReads/')
-    parser.add_argument('--out_dir_report', help='Path to out put folder. Default=Report/figure/data/', default='Report/figure/data/')
-    parser.add_argument('--sample_names_file', help='Text file with sample names. Default=sample_names_info.txt', default='sample_names.txt')
+    parser = argparse.ArgumentParser(prog='trimmingReads.py',
+        description = 'QC and adapter trimming using Trim Galore')
+    parser.add_argument('-v', '--version', 
+        action='version', 
+        version='%(prog)s-'+__version__)
+    parser.add_argument('--analysis_info_file', 
+        help='Text file with details of the analysis. Default=analysis_info.txt', 
+        default='analysis_info.txt')
+    parser.add_argument('--in_dir', 
+        help='Path to folder containing fastq files. Default=rawReads/', 
+        default='rawReads/')
+    parser.add_argument('--out_dir', 
+        help='Path to out put folder. Default=trimmedReads/', 
+        default='trimmedReads/')
+    parser.add_argument('--out_dir_report', 
+        help='Path to out put folder. Default=Report/figure/data/', 
+        default='Report/figure/data/')
+    parser.add_argument('--sample_names_file', 
+        help='Text file with sample names. Default=sample_names_info.txt', 
+        default='sample_names.txt')
     #parser.add_argument('--ncores', help='Number of cores to use. Default=8', default='8')
     args=parser.parse_args()
 
@@ -50,6 +62,7 @@ if __name__ == '__main__':
     #Ncores
     #ncores=int(args.ncores)
     ncores=int(ai['ncores'])
+    ninstances=int(ai['ninstances'])
 
     # Read sample names text file
     sample_names_file=args.sample_names_file
@@ -65,9 +78,9 @@ if __name__ == '__main__':
 
     # Run trimm galore
     functions.make_sure_path_exists(out_dir)
-    Parallel(n_jobs=ncores)(delayed(trimming)(i) for i in sampleNames)
+    Parallel(n_jobs=ninstances)(delayed(trimming)(i) for i in sampleNames)
     functions.make_sure_path_exists(out_dir_report)
     
     # Nreads
-    os.system("Rscript bin/trimming_summary.R " + in_dir + " " + out_dir + " " + out_dir_report )
+    functions.runAndCheck("srun /usr/bin/Rscript bin/trimming_summary.R " + in_dir + " " + out_dir + " " + out_dir_report, "Error making trimming summary")
 

@@ -11,17 +11,20 @@ import logging
 from joblib import Parallel, delayed
 import multiprocessing
 import subprocess
-#sys.path.insert(0,'/usr/local/bin/')
 import functions
 import argparse
 
-__version__ = 'v01'
+__version__ = 'v02'
 # created on 17/08/2016
 
 if __name__ == '__main__':
 
-    """ This script creates a file which needs to be filled with information required for a methylSeq project.
-    - It takes one argument, the 'outfile', which is the name of the output file. The default is 'analysis_info.txt'""" 
+    '''This script runs bcl2fastq.
+
+    If uses the parameters in the analysis_info file.analysis_info_file.
+    If bcl2fastq fails, the script will quit with exit code 1, otherwise
+    it will quit with exit code 0
+    '''
 
     parser=argparse.ArgumentParser(prog='analysis_info.py', description='Creates analysis_info.txt')
     parser.add_argument('-v','--version',action='version',version='%(prog)s-'+__version__)
@@ -30,8 +33,8 @@ if __name__ == '__main__':
 
     # Collect info from analysis_info_file
     ai=functions.read_analysis_info_file(args.analysis_info_file)
-    
-    os.system("bcl2fastq -R " + ai['run_folder'] + " -o " + ai['bcl2fastq_output'] + " --no-lane-splitting -l NONE --sample-sheet " + ai['run_samplesheet'])
-    
 
-
+    functions.runAndCheck("bcl2fastq -R " + ai['run_folder'] 
+        + " -o " + ai['bcl2fastq_output'] 
+        + " --no-lane-splitting -l NONE --sample-sheet " + ai['run_samplesheet'])
+    # functions.runAndCheck("echo 'Moo'", "Moose")

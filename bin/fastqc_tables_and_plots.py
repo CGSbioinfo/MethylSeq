@@ -11,17 +11,16 @@ import logging
 from joblib import Parallel, delayed
 import multiprocessing
 import subprocess
-#sys.path.insert(0,'/usr/local/bin')
 import functions
 import argparse
 
 def tables(i):
     outdir = re.sub('fastqc_data.txt', '', i)
-    os.system("python bin/create_fastqcTables.py " + i + " all " + outdir)
+    functions.runAndCheck("python bin/create_fastqcTables.py " + i + " all " + outdir, "Error making fastqc tables")
 
 def plots(i):
     #outdir = re.sub('fastqc_data.txt', '', i)
-    os.system('Rscript bin/create_fastqcPlots_perSample.R ' + in_dir + ' ' + i + ' ' + readType + ' ' + out_dir_report + ' ' + suffix_name + ' ' + args.plot_device)
+    functions.runAndCheck('/usr/bin/Rscript bin/create_fastqcPlots_perSample.R ' + in_dir + ' ' + i + ' ' + readType + ' ' + out_dir_report + ' ' + suffix_name + ' ' + args.plot_device)
 
 
 ##############################################################
@@ -70,5 +69,5 @@ if __name__ == '__main__':
     functions.make_sure_path_exists(out_dir_report)
     Parallel(n_jobs=8)(delayed(plots)(i) for i in sampleNames)
     print "Made plots per sample... \n"
-    os.system('Rscript bin/create_fastqcPlots_allSamples.R ' + in_dir + ' ' + sample_names_file + ' ' + readType + ' ' + out_dir_report + ' ' + suffix_name + ' ' + args.plot_device)
+    functions.runAndCheck('/usr/bin/Rscript bin/create_fastqcPlots_allSamples.R ' + in_dir + ' ' + sample_names_file + ' ' + readType + ' ' + out_dir_report + ' ' + suffix_name + ' ' + args.plot_device, "Error making fastqc plots")
     print "Made plots all samples... \n"

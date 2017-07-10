@@ -8,6 +8,7 @@ import glob
 import time
 import pickle
 import logging
+import subprocess
 from joblib import Parallel, delayed
 import multiprocessing
 # version v01
@@ -92,6 +93,20 @@ def check_gz(dir):
         gz =""
     return(gz)
 
+def check_gz(dir, suffix):
+    """ Determines if files with the given extension are gzipped and returns a gz string which 
+    will be added as a suffix when file names are called in further steps
+    """
+    readFiles = []
+    for root, dir, files in os.walk(dir):
+        readFiles.extend(files)
+    indicesgzFiles = [i for i, x in enumerate(readFiles) if re.findall("."+suffix+".gz", x)]
+    if indicesgzFiles:
+        gz =".gz"
+    else:
+        gz =""
+    return(gz)
+
 def get_strand(strand):
     """ Reads the strand information and returns the specific terms used in picard and htseq """
 
@@ -112,3 +127,22 @@ def get_strand(strand):
         elif strand_htseq == 'reverse':
             strand_picard = 'SECOND_READ_TRANSCRIPTION_STRAND'
     return([strand_picard, strand_htseq])
+
+def runAndCheck(cmd, msg):
+    '''Run the given command and check the return value.
+
+        The script will print the given error message and quit 
+        with exit code 1 if the command did not return
+        exit code 0
+
+        --cmd - the command to be run
+        --msg - the message to print if the command returns an error
+    '''
+    try:
+        retcode = subprocess.call(cmd, shell=True)
+        if retcode != 0:
+            print msg+". Quitting."
+            sys.exit(1)
+    except OSError as e:
+        print >>sys.stderr, "Execution exception:", e
+        sys.exit(1)

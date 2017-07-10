@@ -11,12 +11,29 @@ import logging
 from joblib import Parallel, delayed
 import multiprocessing
 import subprocess
-#sys.path.insert(0,'./')
 import functions
 import argparse
 
-__version__='v01'
+__version__='v02'
 # created 17/08/2016
+# modified 2017-06-13 BS - will move files to existing empty raw reads folder
+
+def moveReads(sampleNames, fastq):
+    ''' Move the sample reads
+
+    Move the fastq files for the given sample names
+    into the rawReads folder.
+
+    '''
+    functions.make_sure_path_exists('rawReads')
+    sampleDir = []
+    for sample in sampleNames:
+        reads = [fastq[i] for i,x in enumerate(fastq) if re.findall(sample,x)]
+        if sample not in sampleDir:
+            functions.make_sure_path_exists('rawReads/'+sample)
+        for r in reads:
+            os.system('mv ' + '"' + r + '"' + ' rawReads/' + sample)
+        sampleDir.append(sample)
 
 if __name__ == '__main__':
 
@@ -35,7 +52,6 @@ if __name__ == '__main__':
     sample_names_file = args.sample_names_file
     sampleNames = functions.read_sample_names(sample_names_file)
         
-    # Create rawReads folder
     # Check if rawReads exists
     folders = os.listdir('.')
     readsFiles = [folders[i] for i, x in enumerate(folders) if re.findall('rawReads',x)]
@@ -50,17 +66,23 @@ if __name__ == '__main__':
         fastq=[allFiles[y] for y, x in enumerate(allFiles) if re.findall("fastq.gz", x)]
         fastq=[args.in_dir + x for x in fastq]
 
+    
+
+
     # Move reads
     if not readsFiles:
-        functions.make_sure_path_exists('rawReads')
-        sampleDir = []
-        for sample in sampleNames:
-            reads = [fastq[i] for i,x in enumerate(fastq) if re.findall(sample,x)]
-            if sample not in sampleDir:
-                functions.make_sure_path_exists('rawReads/'+sample)
-            for r in reads:
-               os.system('mv ' + '"' + r + '"' + ' rawReads/' + sample)
-            sampleDir.append(sample)
+        # The rawReads directory does not exist.
+        # Create the directory and move the files.
+        print "rawReads/ folder does not exist. Creating folder and moving files."
+        moveReads(sampleNames, fastq)
     else:
-        print "rawReads/ already folder exists"
+        # If the rawReads directory exists and is empty
+        # - for example if step 1 failed before bcl2fastq 
+        # completed, then we need to continue moving files. 
+        # Otherwise fail with meaningful error.
+        if os.listdir('rawReads') == []: 
+            print "rawReads/ folder exists and is empty. Moving files."
+            moveReads(sampleNames, fastq)
+        else:
+            print "rawReads/ folder exists and contains files. Not moving files."
 
