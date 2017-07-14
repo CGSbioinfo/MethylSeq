@@ -11,7 +11,6 @@ import logging
 from joblib import Parallel, delayed
 import multiprocessing
 import subprocess
-#sys.path.insert(0,'/usr/local/bin/')
 import functions
 import argparse
 

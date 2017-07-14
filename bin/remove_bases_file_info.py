@@ -21,7 +21,7 @@ __version__ = 'v01'
 if __name__ == '__main__':
 
     """ This script creates a file which needs to be filled with information required for a methylSeq project.
-    - It takes one argument, the 'outfile', which is the name of the output file. The default is 'analysis_info.txt'""" 
+    - It takes one argument, the 'outfile', which is the name of the output file.""" 
 
     parser=argparse.ArgumentParser(prog='remove_bases_file_info.py', description='Creates remove_bases_file.txt')
     parser.add_argument('-v','--version',action='version',version='%(prog)s-'+__version__)
