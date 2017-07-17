@@ -4,16 +4,21 @@ suppressMessages(library(ggplot2))
 suppressMessages(library(reshape))
 suppressMessages(require(grid))
 suppressMessages(library(xtable))
+source("functions.r")
 
-in_dir=commandArgs(TRUE)[1]
+in_dir     =commandArgs(TRUE)[1]
 sample_name=commandArgs(TRUE)[2]
-readType=commandArgs(TRUE)[3] 
-outdir=commandArgs(TRUE)[4]
-suffix=commandArgs(TRUE)[5]
+readType   =commandArgs(TRUE)[3] 
+outdir     =commandArgs(TRUE)[4]
+suffix     =commandArgs(TRUE)[5]
 plot_device=commandArgs(TRUE)[6]
 if (is.na(suffix)){
   suffix=''
 }
+
+checkPath(in_dir, "Sample input folder")
+checkPath(sample_name, "Sample names file")
+checkPath(outdir, "Output directory")
 
 files=list.files(path = in_dir, full.names = TRUE, recursive = TRUE)
 files=files[grep(sample_name,files)]

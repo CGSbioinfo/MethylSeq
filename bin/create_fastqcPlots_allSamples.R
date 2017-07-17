@@ -4,16 +4,22 @@ suppressMessages(library(ggplot2))
 suppressMessages(library(reshape))
 suppressMessages(require(grid))
 suppressMessages(library(xtable))
+source("functions.r")
 
-in_dir=commandArgs(TRUE)[1]
+in_dir      =commandArgs(TRUE)[1]
 sample_names=commandArgs(TRUE)[2]
-readType=commandArgs(TRUE)[3]
-outdir=commandArgs(TRUE)[4]
-suffix=commandArgs(TRUE)[5]
-plot_device=commandArgs(TRUE)[6]
+readType    =commandArgs(TRUE)[3]
+outdir      =commandArgs(TRUE)[4]
+suffix      =commandArgs(TRUE)[5]
+plot_device =commandArgs(TRUE)[6]
 if (is.na(suffix)){
   suffix=''
 }
+
+checkPath(in_dir, "Sample input folder")
+checkPath(sample_names, "Sample names file")
+checkPath(outdir, "Output directory")
+
 
 files=list.files(path = in_dir, full.names = TRUE, recursive = TRUE)
 sample_names=read.table(sample_names)[,1]
@@ -260,3 +266,4 @@ p=ggplot(mr2, aes(x=Base, y=Percentage, group=Sample, colour=Sample, shape=Sampl
 }
 ggsave(filename=paste0(outdir,'/per_base_sequence_content_r2', suffix, '.', plot_device), width=8, height=3.5, units='in', plot=p)
 
+quit(save="no", status=0)

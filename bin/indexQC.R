@@ -1,9 +1,10 @@
 #!/usr/local/bin/Rscript
 suppressMessages(library(ggplot2))
 suppressMessages(library(reshape))
+source("functions.r")
 
-indir = commandArgs(TRUE)[1]
-outdir= commandArgs(TRUE)[2]
+indir  = commandArgs(TRUE)[1]
+outdir = commandArgs(TRUE)[2]
 dir.create(outdir, recursive=TRUE, showWarnings=FALSE)
 files=list.files(indir, recursive=TRUE, pattern='fastqc_data.txt$')
 
