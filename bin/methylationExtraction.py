@@ -91,6 +91,22 @@ def createRemoveBaseDict(remove_bases_file):
                 remove_bases_dict[key]=(ignore, ignore_3prime, ignore_r2, ignore_3prime_r2)
     return remove_bases_dict
 
+
+def makeMbiasPlots():
+    '''
+    Call the R script to generate methylation bias plots.
+    '''
+
+    clipped = "_clipped.pdf" if remove_bases_dict else ""
+    out_file = "Report/figure/methExtractQC/Mbias_plot%s.pdf" % clipped
+
+    cmdStr = ('srun /usr/bin/Rscript bin/methylExtractQC_mbias_plot.R %s %s .M-bias.txt %s'
+            % (out_dir, sample_names_file, out_file))
+    print("Making M-bias plots")
+    functions.runAndCheck(cmdStr, "Error generating M-bias plots")
+       
+
+
 #########################
 
 __version__='v01'
@@ -101,18 +117,15 @@ if __name__ == '__main__':
     parser.add_argument('-v', '--version', action='version', version='%(prog)s-'+__version__)
     parser.add_argument('--analysis_info_file', help='Text file with details of the analysis. Default=analysis_info.txt', default='analysis_info.txt')
     parser.add_argument('--in_dir', help='Path to folder containing bam files. Default=alignedReads/', default='alignedReads/')
-    parser.add_argument('--out_dir', help='Path to out put folder. Default=alignedReads/', default='alignedReads/')
+    parser.add_argument('--out_dir', help='Path to output folder. Default=alignedReads/', default='alignedReads/')
     parser.add_argument('--sample_names_file', help='Text file with sample names. Default=sample_names.txt', default='sample_names.txt')
     parser.add_argument('--dedup', action='store_true')
-    # parser.add_argument('--ncores', help='Number of cores to use. Default=8', default='8')
     parser.add_argument('--remove_bases_file', help='Text file with bases to remove from each sample. Default=mbias_remove_bases.txt', default='mbias_remove_bases.txt')
     args=parser.parse_args()
 
-    # Set path of working directory
     ai=functions.read_analysis_info_file(args.analysis_info_file)
-
+    # Set path of working directory
     path = ai['working_directory']
-    # path=os.getcwd()
 
     #Ncores
     ncores=int(ai['ncores'])
@@ -124,16 +137,21 @@ if __name__ == '__main__':
 
     # Set input and output directories
     in_dir = path + args.in_dir
-    out_dir= path + args.out_dir
-
-    functions.make_sure_path_exists(out_dir)
 
     if not os.path.exists(in_dir):
         print "Input directory was not found: " + in_dir
         sys.exit(1)
 
+    out_dir = path + args.out_dir
+
+    functions.make_sure_path_exists(out_dir)
+
     # Read remove bases file
-    remove_bases_dict = createRemoveBaseDict(remove_bases_file)
+    remove_bases_dict = createRemoveBaseDict(args.remove_bases_file)
 
     Parallel(n_jobs=ninstances)(delayed(methylationExtraction)(i,ai, remove_bases_dict) for i in sampleNames)
 
+    # Create the QC plots
+    makeMbiasPlots()
+
+    sys.exit(0)
