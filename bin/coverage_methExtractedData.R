@@ -7,7 +7,6 @@ suppressMessages(library(rtracklayer))
 suppressMessages(library(dplyr))
 suppressMessages(library(ggplot2))
 suppressMessages(library(reshape))
-source("functions.r")
 
 sampleInfoFile           =commandArgs(TRUE)[1]
 bedGraphFolder           =commandArgs(TRUE)[2]
@@ -17,12 +16,30 @@ annotation_target_regions=commandArgs(TRUE)[5]
 
 ##################
 #
+# Load external 
+# functions
+#
+##################
+
+cat("Loading functions ...\n")
+
+file.arg.name <- "--file="
+script.name <- sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
+script.basename <- dirname(script.name)
+other.name <- paste(sep="/", script.basename, "functions.r")
+print(paste("Sourcing",other.name,"from",script.name))
+source(other.name)
+# source("bin/functions.r")
+
+##################
+#
 # Check validity of 
 # file paths
 #
 ##################
 
-checkPath(sampleInfoFile, "Sample name file")
+# functions::checkPath() will quit if file not found
+checkPath(sampleInfoFile, "Sample name file") 
 checkPath(bedGraphFolder, "BedGraph folder")
 checkPath(annotation_target_regions, "Genome annotation")
 
@@ -151,3 +168,18 @@ p1=ggplot(cov_table.melt, aes(x=Coverage,y=value/number_of_sites_covered), group
 ggsave(filename=out_targetRegion, plot=p1, device="pdf", height=7, width=7)
 cat("Done\n")
 quit(save="no", status=0)
+
+##################
+#
+# Perform differential 
+# analysis of whole genome
+#
+##################
+
+
+##################
+#
+# Perform differential 
+# analysis of target regions
+#
+##################
