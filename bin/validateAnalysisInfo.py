@@ -87,6 +87,13 @@ if __name__ == '__main__':
         ok = False
         print "Number of instances is not a valid integer: " + ai['ninstances']
 
+    # Check the cleanup option
+    clean = (ai['clean_files'])
+    if(clean!='True' and clean!='False'):
+        ok = False
+        print "The clean_files option must be either True or False: "+ clean
+
+
     # Output result to system
     if ok:
         print "Analysis info file passed validation"
@@ -97,7 +104,7 @@ if __name__ == '__main__':
 
 
     # Example analysis_info.txt:
-     # working_directory = /mnt/research/bms41/methylSeq/aggressive/2017-06/
+    # working_directory = /mnt/research/bms41/methylSeq/aggressive/2017-06/
     # run_folder = /mnt/research/bms41/methylSeq/151018_NS500125_0141_AHL5VMBGXX/
     # run_samplesheet = /mnt/research/bms41/methylSeq/151018_NS500125_0141_AHL5VMBGXX/SampleSheet.csv
     # bcl2fastq_output = fastq/ 
@@ -108,5 +115,6 @@ if __name__ == '__main__':
     # target_regions_bed = 
     # ncores = 8
     # ninstances = 2
+    # clean_files = False
 
     # Note: currently, target_regions_bed is only called in calculateCoverage.py, which is not in the main pipeline
