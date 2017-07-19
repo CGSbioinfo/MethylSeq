@@ -16,11 +16,11 @@ import argparse
 
 def tables(i):
     outdir = re.sub('fastqc_data.txt', '', i)
-    functions.runAndCheck("python bin/create_fastqcTables.py " + i + " all " + outdir, "Error making fastqc tables")
+    functions.runAndCheck("srun python bin/create_fastqcTables.py " + i + " all " + outdir, "Error making fastqc tables")
 
 def plots(i):
     #outdir = re.sub('fastqc_data.txt', '', i)
-    functions.runAndCheck('/usr/bin/Rscript bin/create_fastqcPlots_perSample.R ' + in_dir + ' ' + i + ' ' + readType + ' ' + out_dir_report + ' ' + suffix_name + ' ' + args.plot_device)
+    functions.runAndCheck('srun /usr/bin/Rscript bin/create_fastqcPlots_perSample.R ' + in_dir + ' ' + i + ' ' + readType + ' ' + out_dir_report + ' ' + suffix_name + ' ' + args.plot_device)
 
 
 ##############################################################
@@ -48,10 +48,13 @@ if __name__ == '__main__':
     #Ncores
     ncores=int(args.ncores)
 
+
     # Read sample names text file
     ai=functions.read_analysis_info_file(args.analysis_info_file)
     sample_names_file=args.sample_names_file
     sampleNames = functions.read_sample_names(sample_names_file)
+
+    ninstances=int(ai['ninstances'])
 
     # Set input and output directories if not 'rawReads/'
     in_dir=path + '/' + args.in_dir
@@ -62,12 +65,12 @@ if __name__ == '__main__':
     # Create tables
     files=functions.get_filepaths(in_dir)
     files = [files[y] for y, x in enumerate(files) if re.findall("fastqc_data.txt", x)] 
-    Parallel(n_jobs=8)(delayed(tables)(i) for i in files)
+    Parallel(n_jobs=ninstances)(delayed(tables)(i) for i in files)
     print "Got data from fastqc output... \n"    
 
     # Create plots
     functions.make_sure_path_exists(out_dir_report)
-    Parallel(n_jobs=8)(delayed(plots)(i) for i in sampleNames)
+    Parallel(n_jobs=ninstances)(delayed(plots)(i) for i in sampleNames)
     print "Made plots per sample... \n"
-    functions.runAndCheck('/usr/bin/Rscript bin/create_fastqcPlots_allSamples.R ' + in_dir + ' ' + sample_names_file + ' ' + readType + ' ' + out_dir_report + ' ' + suffix_name + ' ' + args.plot_device, "Error making fastqc plots")
+    functions.runAndCheck('srun /usr/bin/Rscript bin/create_fastqcPlots_allSamples.R ' + in_dir + ' ' + sample_names_file + ' ' + readType + ' ' + out_dir_report + ' ' + suffix_name + ' ' + args.plot_device, "Error making fastqc plots")
     print "Made plots all samples... \n"

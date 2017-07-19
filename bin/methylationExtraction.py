@@ -67,9 +67,11 @@ def methylationExtraction(i, ai, remove_bases_dict):
             % (out_dir, i))
         ignoreString = ""
 
-    
-    cmdStr = ('srun -c %i bismark_methylation_extractor %s --output %s %s %s &>%s'
-            % (ncores, params, out_dir, ignoreString, bamFile, logFile ))
+
+    cx_string = "--CX_context" if args.cx else ""
+
+    cmdStr = ('srun -c %i bismark_methylation_extractor %s --output %s %s %s %s &>%s'
+            % (ncores, params, out_dir, ignoreString, bamFile, cx_string, logFile ))
     print("Extracting methylation from "+i)
     functions.runAndCheck(cmdStr, "Error extracting methylation")
 
@@ -109,18 +111,36 @@ def makeMbiasPlots():
 
 #########################
 
-__version__='v01'
+__version__='v02'
 # created 18/08/2016
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(prog='methylationExtraction.py',description = 'Methylation extraction from bamfiles.')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s-'+__version__)
-    parser.add_argument('--analysis_info_file', help='Text file with details of the analysis. Default=analysis_info.txt', default='analysis_info.txt')
-    parser.add_argument('--in_dir', help='Path to folder containing bam files. Default=alignedReads/', default='alignedReads/')
-    parser.add_argument('--out_dir', help='Path to output folder. Default=alignedReads/', default='alignedReads/')
-    parser.add_argument('--sample_names_file', help='Text file with sample names. Default=sample_names.txt', default='sample_names.txt')
-    parser.add_argument('--dedup', action='store_true')
-    parser.add_argument('--remove_bases_file', help='Text file with bases to remove from each sample. Default=mbias_remove_bases.txt', default='mbias_remove_bases.txt')
+    parser = argparse.ArgumentParser(prog='methylationExtraction.py',
+        description = 'Methylation extraction from bamfiles.')
+    parser.add_argument('-v', '--version', 
+        action='version', 
+        version='%(prog)s-'+__version__)
+    parser.add_argument('--analysis_info_file', 
+        help='Text file with details of the analysis. Default=analysis_info.txt', 
+        default='analysis_info.txt')
+    parser.add_argument('--in_dir', 
+        help='Path to folder containing bam files. Default=alignedReads/', 
+        default='alignedReads/')
+    parser.add_argument('--out_dir', help='Path to output folder. Default=alignedReads/', 
+        default='alignedReads/')
+    parser.add_argument('--sample_names_file', help='Text file with sample names. Default=sample_names.txt', 
+        default='sample_names.txt')
+    parser.add_argument('--dedup', 
+        action='store_true', 
+        default=True, 
+        help="Analyse deduplicated reads")
+    parser.add_argument('--cx', 
+        action='store_true', 
+        default=False, 
+        help="Extract every single cytosine in the genome. Required if using DMRcaller package later.")
+    parser.add_argument('--remove_bases_file', 
+        help='Text file with bases to remove from each sample. Default=mbias_remove_bases.txt', 
+        default='mbias_remove_bases.txt')
     args=parser.parse_args()
 
     ai=functions.read_analysis_info_file(args.analysis_info_file)

@@ -15,6 +15,9 @@ import functions
 import argparse
 
 def trimming(i):
+    '''
+    Trim sequencing reads using trim_galore
+    '''
     allFiles = os.listdir(in_dir + "/" + i )
     pairedReads_temp = [allFiles[y] for y, x in enumerate(allFiles) if re.findall("_R2", x)]
     if pairedReads_temp:
@@ -27,7 +30,7 @@ def trimming(i):
 
 #########################
 
-__version__='v01'
+__version__='v02'
 # created 18/08/2016
 
 if __name__ == '__main__':
@@ -51,26 +54,24 @@ if __name__ == '__main__':
     parser.add_argument('--sample_names_file', 
         help='Text file with sample names. Default=sample_names_info.txt', 
         default='sample_names.txt')
-    #parser.add_argument('--ncores', help='Number of cores to use. Default=8', default='8')
+
     args=parser.parse_args()
 
-    #path=functions.read_analysis_info_file(params_file)['Working directory']
+
     path=os.getcwd()
     os.chdir(path)
     ai=functions.read_analysis_info_file(args.analysis_info_file)    
 
     #Ncores
-    #ncores=int(args.ncores)
     ncores=int(ai['ncores'])
     ninstances=int(ai['ninstances'])
 
     # Read sample names text file
-    sample_names_file=args.sample_names_file
-    sampleNames = functions.read_sample_names(sample_names_file)
+    sampleNames = functions.read_sample_names(args.sample_names_file)
 
     # Set input and output directories if not 'rawReads/'
-    in_dir=path + '/' + args.in_dir
-    out_dir=path + '/' + args.out_dir
+    in_dir        =path + '/' + args.in_dir
+    out_dir       =path + '/' + args.out_dir
     out_dir_report=path + '/' + args.out_dir_report
 
     # Detect if files are gz
@@ -81,6 +82,8 @@ if __name__ == '__main__':
     Parallel(n_jobs=ninstances)(delayed(trimming)(i) for i in sampleNames)
     functions.make_sure_path_exists(out_dir_report)
     
-    # Nreads
-    functions.runAndCheck("srun /usr/bin/Rscript bin/trimming_summary.R " + in_dir + " " + out_dir + " " + out_dir_report, "Error making trimming summary")
+    # Generate summary stats
+    cmd_str = ("srun /usr/bin/Rscript bin/trimming_summary.R %s %s %s " %
+        (in_dir, out_dir, out_dir_report))
+    functions.runAndCheck(cmd_str, "Error making trimming summary")
 

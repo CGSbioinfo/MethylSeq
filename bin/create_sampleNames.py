@@ -11,7 +11,6 @@ import logging
 from joblib import Parallel, delayed
 import multiprocessing
 import subprocess
-#sys.path.insert(0,'/usr/local/bin/')
 import functions
 import argparse
 
@@ -20,8 +19,13 @@ __version__ = 'v01'
 
 if __name__ == '__main__':
 
-    """ This script creates a file which needs to be filled with information required for a methylSeq project.
-    - It takes one argument, the 'outfile', which is the name of the output file. The default is 'analysis_info.txt'""" 
+    """ 
+    This script creates a file which needs to be filled with information 
+    required for a methylSeq project.
+
+    It takes one argument, the 'outfile', which is the name of the output file. 
+    The default is 'analysis_info.txt'
+    """ 
 
     parser=argparse.ArgumentParser(prog='create_sampleNames.py', description='Creates sample_names.txt with sample names')
     parser.add_argument('-v','--version',action='version',version='%(prog)s-'+__version__)
@@ -43,15 +47,9 @@ if __name__ == '__main__':
     fastq=[re.sub('.*/','', f) for f in fastq]
     fastq=[re.sub('_R[0-9_].*','',f) for f in fastq]
     fastq=list(set(fastq))
-    #fastq=[f.replace('.fastq.gz', '') for f in fastq]
-    #print fastq
-    #fastq=[f.replace('.','') for f in fastq]
-    #print fastq 
-    
 
     outfile=open(args.out_file, 'w')
     for f in fastq:
-        
         outfile.write(f.split('/')[-1] + '\n')
     outfile.close()        
     
