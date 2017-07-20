@@ -1,10 +1,10 @@
 #!/usr/local/bin/Rscript
 
+cat("Loading R packages ...\n")
 suppressMessages(library(ggplot2))
 suppressMessages(library(reshape))
 suppressMessages(require(grid))
 suppressMessages(library(xtable))
-source("functions.r")
 
 in_dir     =commandArgs(TRUE)[1]
 sample_name=commandArgs(TRUE)[2]
@@ -16,58 +16,118 @@ if (is.na(suffix)){
   suffix=''
 }
 
+##################
+#
+# Load external 
+# functions
+#
+##################
+
+cat("Loading functions ...\n")
+
+file.arg.name = "--file="
+script.name   = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
+script.folder = dirname(script.name)
+script.toload = paste(sep="/", script.folder, "functions.r")
+
+source(script.toload)
+
+##################
+#
+# Check validity of 
+# file paths
+#
+##################
+
 checkPath(in_dir, "Sample input folder")
 checkPath(sample_name, "Sample names file")
 checkPath(outdir, "Output directory")
 
+##################
+#
+# Generate plots
+#
+##################
+
 files=list.files(path = in_dir, full.names = TRUE, recursive = TRUE)
 files=files[grep(sample_name,files)]
 
-generate_qc_plot=function(files,sample_name,type){
-  sample_temp=sample_name
-  #files_temp=files[grep(sample_temp,files)]
-  files_temp=files[grep(type,files)]
-  r1=files_temp[grep('_R1_',files_temp)]
-  dat_r1=read.table(r1, stringsAsFactors = FALSE)
+generate_qc_plot = function(files,sample_name,type){
+  sample_temp = sample_name
+  files_temp  = files[grep(type,files)]
+  r1          = files_temp[grep('_R1_',files_temp)]
+  dat_r1      = read.table(r1, stringsAsFactors = FALSE)
+  
   if (readType=='pairedEnd'){
-    r2=files_temp[grep('_R2_',files_temp)]
-    dat_r2=read.table(r2, stringsAsFactors = FALSE)
+    r2        = files_temp[grep('_R2_',files_temp)]
+    dat_r2    = read.table(r2, stringsAsFactors = FALSE)
   }
-  if (type=='per_base_sequence_quality.txt'){
-    colnames(dat_r1)=c('Base','Mean','Median','Lower_quartile', 'Upper_quartile', 'x10th_percentile', 'x90th_percentile')
-    dat_r1$Base <- factor(dat_r1$Base, as.character(dat_r1$Base))
-    dat_r1$panel='Read 1' 
-    if (readType=='pairedEnd'){
-      colnames(dat_r2)=c('Base','Mean','Median','Lower_quartile', 'Upper_quartile', 'x10th_percentile', 'x90th_percentile')
-      dat_r2$Base <- factor(dat_r2$Base, as.character(dat_r2$Base))
-      dat_r2$panel='Read 2'
-      dat=rbind(dat_r1,dat_r2)
-      p=ggplot(dat,
-             aes(x = Base, ymin = x10th_percentile, lower = Lower_quartile, middle = Median, upper = Upper_quartile, 
-                 ymax = x90th_percentile)) + 
-        geom_boxplot(stat='identity', fill='yellow') + facet_wrap(~panel) + ggtitle(sample_temp) + 
-        theme(axis.text.x = element_text(size = 5, angle=90, hjust=1, vjust=1), axis.text.y=element_text(size=6),
-              plot.title = element_text(lineheight=.8, face="bold", size=9), 
-	      axis.title=element_text(size=10), strip.text=element_text(size=8)) + 
-        annotate("rect", xmin=-Inf, xmax=Inf, ymin=0, ymax=20, alpha=0.1, fill="red") + 
-        annotate("rect", xmin=-Inf, xmax=Inf, ymin=20, ymax=28, alpha=0.1, fill="yellow") + 
-        annotate("rect", xmin=-Inf, xmax=Inf, ymin=28, ymax=Inf, alpha=0.1, fill="green")  
-        xlab("Position of base in read")
-    } else {
-      dat=dat_r1
+
+  createQualityPlot = function(){
+
+    # Make the basic ggplot object with common settings
+    # for single and paired end read plots
+    # Return - a ggplot object
+    makeBaseQualityPlot = function(dat){
       p=ggplot(dat, 
              aes(x = Base, ymin = x10th_percentile, lower = Lower_quartile, middle = Median, upper = Upper_quartile, 
                  ymax = x90th_percentile)) + 
-        geom_boxplot(stat='identity', fill='yellow') + ggtitle(sample_temp) + 
-        theme(axis.text.x = element_text(size = 8, angle=90, hjust=1, vjust=1), axis.text.y=element_text(size=6), 
-              plot.title = element_text(lineheight=.8, face="bold"), axis.title=element_text(size=10)) + 
-        annotate("rect", xmin=-Inf, xmax=Inf, ymin=0, ymax=20, alpha=0.1, fill="red") + 
-        annotate("rect", xmin=-Inf, xmax=Inf, ymin=20, ymax=28, alpha=0.1, fill="yellow") + 
+        geom_boxplot(stat='identity', fill='yellow') + 
+        ggtitle(sample_temp) + 
+        theme(axis.text.x = element_text(size = 8, angle=90, hjust=1, vjust=1), 
+              axis.text.y = element_text(size=6), 
+              plot.title  = element_text(lineheight=.8, face="bold"), 
+              axis.title  = element_text(size=10)) + 
+        annotate("rect", xmin=-Inf, xmax=Inf, ymin=0,  ymax=20,  alpha=0.1, fill="red") + 
+        annotate("rect", xmin=-Inf, xmax=Inf, ymin=20, ymax=28,  alpha=0.1, fill="yellow") + 
         annotate("rect", xmin=-Inf, xmax=Inf, ymin=28, ymax=Inf, alpha=0.1, fill="green") + 
         xlab("Position of base in read")
+        return(p)
     }
-    ggsave(filename=paste0(outdir,'/',sample_temp, suffix, '_per_base_sequence_qual.', plot_device), plot=p, height=3.5, width=10)
-  } else if (type=='per_base_sequence_content.txt'){
+
+    column.names = c('Base','Mean','Median',
+      'Lower_quartile', 'Upper_quartile', 'x10th_percentile', 'x90th_percentile')
+
+    colnames(dat_r1)=column.names
+    dat_r1$Base <- factor(dat_r1$Base, as.character(dat_r1$Base))
+    dat_r1$panel='Read 1' 
+
+    if (readType=='pairedEnd'){
+      colnames(dat_r2)=column.names
+      dat_r2$Base <- factor(dat_r2$Base, as.character(dat_r2$Base))
+      dat_r2$panel='Read 2'
+      dat=rbind(dat_r1,dat_r2)
+
+      p = makeBaseQualityPlot(dat) + facet_wrap(~panel)
+
+    } else {
+      p = makeBaseQualityPlot(dat_r1)
+    }
+    ggsave(filename=paste0(outdir,'/',sample_temp, suffix, '_per_base_sequence_qual.', plot_device), 
+      plot=p, height=3.5, width=10)
+  }
+
+  createContentPlot = function(){
+
+    # Make the basic ggplot object with common settings
+    # for single and paired end read plots
+    # Return - a ggplot object
+    makeBaseContentPlot = function(dat){
+      p=ggplot(dat, aes(x=Base, y=value, group=variable, colour=variable)) + 
+        geom_line() + 
+        facet_wrap(~panel) + 
+        ggtitle(sample_temp) + 
+        theme(axis.text.x = element_text(size = 5, angle=90), 
+              axis.title.x=element_text(size=10),
+              axis.title.y=element_blank(), 
+              axis.text.y=element_text(size=6),
+              strip.text=element_text(size=8), 
+              legend.position="top", 
+              plot.title = element_text(size=9,lineheight=.8, face="bold", vjust=-1.5))  + 
+        xlab("Position in read") +  
+        ylim(0, 100)
+    }
+
     colnames(dat_r1)=c('Base','%G','%A','%T','%C')
     dat_r1$Base <- factor(dat_r1$Base, as.character(dat_r1$Base))
     dat_r1=melt(dat_r1)
@@ -78,18 +138,27 @@ generate_qc_plot=function(files,sample_name,type){
       dat_r2=melt(dat_r2)
       dat_r2$panel='Read 2'
       dat=rbind(dat_r1,dat_r2)
-      p=ggplot(dat, aes(x=Base, y=value, group=variable, colour=variable)) + 
-        geom_line() + facet_wrap(~panel) + ggtitle(sample_temp) + 
-        theme(axis.text.x = element_text(size = 5, angle=90), axis.title.x=element_text(size=10),axis.title.y=element_blank(), axis.text.y=element_text(size=6),strip.text=element_text(size=8), legend.position="top", plot.title = element_text(size=9,lineheight=.8, face="bold", vjust=-1.5))  + xlab("Position in read") +  ylim(0, 100)
+      p = makeBaseContentPlot(dat) + facet_wrap(~panel)
     } else {
-      dat=dat_r1
-      p=ggplot(dat, aes(x=Base, y=value, group=variable, colour=variable)) + geom_line() + 
-        ggtitle(sample_temp) + theme(axis.text.x = element_text(size = 8, angle=90), axis.title.y=element_blank(), 
-                                     legend.position="top", plot.title = element_text(lineheight=.5, face="bold", vjust=-1.5)) + 
-        xlab("Position in read") +  ylim(0, 100) 
+      p = makeBaseContentPlot(dat_r1)
     }
     ggsave(filename=paste0(outdir,'/',sample_temp, suffix, '_per_base_sequence_content.', plot_device), plot=p, height=3.5, width=10)
-  } else if (type=='kmer_content.txt'){
+  }
+
+  createKmerPlot = function(){
+
+    makeBasicKmerPlot = function(dat){
+      p=ggplot(dat, aes(x=Position, y=value, group=Sequence, colour=Sequence)) + 
+        geom_line() + 
+        ggtitle(sample_temp) +  
+        theme(axis.text.x = element_text(size = 6, angle=90), 
+              axis.title.y=element_blank(), 
+              legend.position="top", 
+              plot.title = element_text(lineheight=.8, face="bold", vjust=-1.5))  + 
+        xlab("Position in read")
+        return(p)
+    }
+
     colnames(dat_r1)=c('Sequence','Content','PValue', 'Obs_Exp_Max', 'Max_Obs_Exp_Position' )
     nbases=76
     m=c()
@@ -123,28 +192,30 @@ generate_qc_plot=function(files,sample_name,type){
       colnames(dat)=c("Sequence","Position","value","panel")
       dat$Position=factor(dat$Position, 1:nbases,ordered = TRUE)
       dat$value=round(x = as.numeric(as.character(dat$value)),digits = 0)
-      p=ggplot(dat, aes(x=Position, y=value, group=Sequence, colour=Sequence)) + geom_line() + 
-        facet_wrap(~panel) + ggtitle(sample_temp) +  
-        theme(axis.text.x = element_text(size = 6, angle=90), axis.title.y=element_blank(), 
-              legend.position="top", plot.title = element_text(lineheight=.8, face="bold", vjust=-1.5))  + 
-        xlab("Position in read")
+      p = makeBasicKmerPlot(dat) + facet_wrap(~panel)
     } else {
       dat = dat_r1
       colnames(dat)=c("Sequence","Position","value","panel")
       dat$Position=factor(dat$Position, 1:nbases,ordered = TRUE)
       dat$value=round(x = as.numeric(as.character(dat$value)),digits = 0)
-      p=ggplot(dat, aes(x=Position, y=value, group=Sequence, colour=Sequence)) + geom_line() + 
-        ggtitle(sample_temp) + theme(axis.text.x = element_text(size = 6, angle=90), 
-                                     axis.title.y=element_blank(), legend.position="top", 
-                                     plot.title = element_text(lineheight=.8, face="bold", vjust=-1.5))  + 
-        xlab("Position in read")
+      p = makeBasicKmerPlot(dat)
     } 
     ggsave(filename=paste0(outdir,'/',sample_temp, suffix, '_kmer_content.', plot_device), plot=p, height=3.5, width=10)
   }
+
+  if (type=='per_base_sequence_quality.txt'){
+    createQualityPlot()
+  } else if (type=='per_base_sequence_content.txt'){
+    createContentPlot()
+  } else if (type=='kmer_content.txt'){
+    createKmerPlot()
+  }
 }
 
+types = c('per_base_sequence_quality.txt', 
+  'per_base_sequence_content.txt',
+  'kmer_content.txt')
 
-generate_qc_plot(files, sample_name, type='per_base_sequence_quality.txt')
-generate_qc_plot(files, sample_name, type='per_base_sequence_content.txt')
-generate_qc_plot(files, sample_name, type='kmer_content.txt')
-
+for (t in types){
+  generate_qc_plot(files, sample_name, type=t)
+}

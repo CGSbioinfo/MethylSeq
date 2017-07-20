@@ -1,12 +1,47 @@
-library(ggplot2)
-library(reshape)
-library(dplyr)
+cat("Loading R packages ...\n")
+
+suppressMessages(library(ggplot2))
+suppressMessages(library(reshape))
+suppressMessages(library(dplyr))
 
 # Read the input arguments
 in_dir      =commandArgs(TRUE)[1]
 sample_names=commandArgs(TRUE)[2]
 pattern     =commandArgs(TRUE)[3]
 outfile     =commandArgs(TRUE)[4]
+
+##################
+#
+# Load external 
+# functions
+#
+##################
+
+cat("Loading functions ...\n")
+
+file.arg.name   = "--file="
+script.name     = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
+script.basename = dirname(script.name)
+other.name      = paste(sep="/", script.basename, "functions.r")
+
+source(other.name)
+
+##################
+#
+# Check validity of 
+# file paths
+#
+##################
+
+checkPath(sample_names, "Sample name file") 
+checkPath(in_dir, "Input folder")
+
+
+##################
+#
+# Create plots
+#
+##################
 
 dir.create(file.path("Report/figure/", "methExtractQC/"))
 
@@ -32,7 +67,7 @@ if (!file.exists(infile)){
 
 cat("Reading file:\n'", infile, "'\n")
 x = readLines(infile, n = -1)
-# x=readLines(con=infile, n=-1L, ok=TRUE, warn=TRUE, encoding = "unknown", skipNul = FALSE )
+
 title=grep("^=",x)-1
 end=which(x=='')
 temp=x[(title[1]+2):(end[1]-1)]

@@ -23,13 +23,12 @@ annotation_target_regions=commandArgs(TRUE)[5]
 
 cat("Loading functions ...\n")
 
-file.arg.name <- "--file="
-script.name <- sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
-script.basename <- dirname(script.name)
-other.name <- paste(sep="/", script.basename, "functions.r")
-print(paste("Sourcing",other.name,"from",script.name))
+file.arg.name   = "--file="
+script.name     = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
+script.basename = dirname(script.name)
+other.name      = paste(sep="/", script.basename, "functions.r")
+
 source(other.name)
-# source("bin/functions.r")
 
 ##################
 #
