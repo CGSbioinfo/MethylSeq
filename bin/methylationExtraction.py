@@ -71,8 +71,8 @@ def methylationExtraction(i, ai, remove_bases_dict):
     cx_string = "--CX_context" if args.cx else ""
 
     cmdStr = ('srun -c %i bismark_methylation_extractor %s --output %s %s %s %s &>%s'
-            % (ncores, params, out_dir, ignoreString, bamFile, cx_string, logFile ))
-    print("Extracting methylation from "+i)
+            % (ncores, params, out_dir, ignoreString, cx_string, bamFile, logFile ))
+    print("\nExtracting methylation from "+i)
     functions.runAndCheck(cmdStr, "Error extracting methylation")
 
 
@@ -95,8 +95,7 @@ def createRemoveBaseDict(remove_bases_file):
 
 
 def makeMbiasPlots():
-    '''
-    Call the R script to generate methylation bias plots.
+    '''Call the R script to generate methylation bias plots.
     '''
 
     clipped = "_clipped.pdf" if remove_bases_dict else ""
@@ -145,15 +144,14 @@ if __name__ == '__main__':
 
     ai=functions.read_analysis_info_file(args.analysis_info_file)
     # Set path of working directory
-    path = ai['working_directory']
+    path = functions.getWorkingDir(args.analysis_info_file) # ai['working_directory']
 
     #Ncores
     ncores=int(ai['ncores'])
     ninstances=int(ai['ninstances'])
 
     # Read sample names text file
-    sample_names_file=args.sample_names_file
-    sampleNames = functions.read_sample_names(sample_names_file)
+    sampleNames = functions.read_sample_names(args.sample_names_file)
 
     # Set input and output directories
     in_dir = path + args.in_dir

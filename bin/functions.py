@@ -138,6 +138,7 @@ def runAndCheck(cmd, msg):
         --cmd - the command to be run
         --msg - the message to print if the command returns an error
     '''
+    print "Invoking: %s" % cmd
     try:
         retcode = subprocess.call(cmd, shell=True)
         if retcode != 0:
@@ -146,3 +147,22 @@ def runAndCheck(cmd, msg):
     except OSError as e:
         print >>sys.stderr, "Execution exception:", e
         sys.exit(1)
+
+def getWorkingDir(analysis_info_file):
+    '''Get the working directory specified in the analysis info file
+    '''
+    ai=read_analysis_info_file(analysis_info_file)
+    return(ai['working_directory'])
+
+def runParallel(function, ai):
+    '''Run the given function in parallel instances
+    for all the sample names
+
+    --function - the function to be run in parallel
+    --ai       - the analysis options
+    '''
+    ncores      = int(ai['ncores'])
+    ninstances  = int(ai['ninstances'])
+    sampleNames = functions.read_sample_names(args.sample_names_file)
+    print ("Setting to run in batches of %i instances with %i cores per instance" % (ninstances, ncores))
+    Parallel(n_jobs=ninstances)(delayed(function)(i, ai) for i in sampleNames)

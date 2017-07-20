@@ -18,11 +18,12 @@ __version__ = 'v02'
 # created on 30/08/2016
 
 def step_1(analysis_info_file):
-    '''
-    Run the first part of the analysis pipeline.
+    '''Run the first part of the analysis pipeline.
 
     Checks the info files, runs bcl2fastq, and creates the sample names file
     for future scripts.
+
+    --analysis_info_file - the file of analysis options
     '''
 
     cmd_str = "python bin/validateAnalysisInfo.py --analysis_info_file %s" % analysis_info_file
@@ -45,8 +46,7 @@ def step_1(analysis_info_file):
     print "Finished running step 1"
 
 def step_2():
-    '''
-    Run the second part of the analysis pipeline.
+    '''Run the second part of the analysis pipeline.
 
     Runs fastqc, trims reads, and generates the QC plots for 
     raw and trimmed data.
@@ -69,11 +69,12 @@ def step_2():
     print "Finished running step 2"
 
 def step_3(analysis_info_file):
-    '''
-    Run the third part of the analysis pipeline.
+    '''Run the third part of the analysis pipeline.
 
     Maps and deduplicates reads with bismark, and creates mapping 
     QC plots.
+
+    --analysis_info_file - the file of analysis options
     '''
     functions.runAndCheck("python bin/validateAnalysisInfo.py --analysis_info_file "+analysis_info_file, "Error in analysis info")
 
@@ -112,10 +113,10 @@ if __name__ == '__main__':
         help='Text file with details of the analysis. Default=analysis_info.txt', 
         default='analysis_info.txt')
 
-    # Note - this argument is never used at the moment.
-    parser.add_argument('--sample_names_file', 
-        help='File with sample names. Default=sample_names.txt', 
-        default='sample_names.txt')
+    # # Note - this argument is never used at the moment.
+    # parser.add_argument('--sample_names_file', 
+    #     help='File with sample names. Default=sample_names.txt', 
+    #     default='sample_names.txt')
 
     # Choose a section of the pipeline to run
     parser.add_argument('--run', 

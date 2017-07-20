@@ -56,7 +56,6 @@ def alignment(sampleName, ai):
         r2 = in_dir + r2[0]
         cmdStr = ('srun -c %i bismark %s --output_dir %s %s -1 %s -2 %s &>%s/bismark_log_%s.txt' 
             % (ncores, bismark_params, out_dir, ai['reference_genome'], r1, r2, out_dir, sampleName ))
-        print "Invoking: %s" % cmdStr
         functions.runAndCheck(cmdStr, "Error in bismark read mapping")
     else:
         print "No read 2 for %s." % sampleName
@@ -64,7 +63,6 @@ def alignment(sampleName, ai):
         # r1 = in_dir + [trimmedReads[y] for y, x in enumerate(trimmedReads) if re.findall( "_R1_.*val_1.fq", x)][0]
         # print "Found "+str(len(r1))+" r1 files"
         # cmdStr = str("srun -c %(ncores)i -mem=20G bismark " + bismark_params + " --output_dir " + out_dir + " " + ai['reference_genome'] +" -1 " + r1 + " -2 " + r2 + " &>" + out_dir + "/bismark_log_"+sampleName+".txt ")
-        # print "Invoking: "+cmdStr
         # functions.runAndCheck(cmdStr, "Error in bismark read mapping")
 
 def deduplicate(sampleName):
@@ -106,19 +104,31 @@ __version__='v01'
 # created 18/08/2016
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(prog='mappingReads.py',description = 'Read mapping using Bismark')
-    parser.add_argument('-v', '--version', action='version', version='%(prog)s-'+__version__)
-    parser.add_argument('--analysis_info_file', help='Text file with details of the analysis. Default=analysis_info.txt', default='analysis_info.txt')
-    parser.add_argument('--in_dir', help='Path to folder containing trimmed fastq files. Default=trimmedReads/', default='trimmedReads/')
-    parser.add_argument('--out_dir', help='Path to out put folder. Default=alignedReads/', default='alignedReads/')
-    parser.add_argument('--sample_names_file', help='Text file with sample names. Default=sample_names.txt', default='sample_names.txt')
-    # parser.add_argument('--ncores', help='Number of cores to use. Default=3', default='3')
-    parser.add_argument('--run', help='Choose a section of the script to run. Possible options: bismark_alignment; deduplicate_bismark; all. Default=all', default='all')
+    parser = argparse.ArgumentParser(prog='mappingReads.py',
+        description = 'Read mapping using Bismark')
+    parser.add_argument('-v', '--version', 
+        action='version', 
+        version='%(prog)s-'+__version__)
+    parser.add_argument('--analysis_info_file', 
+        help='Text file with details of the analysis. Default=analysis_info.txt', 
+        default='analysis_info.txt')
+    parser.add_argument('--in_dir', 
+        help='Path to folder containing trimmed fastq files. Default=trimmedReads/', 
+        default='trimmedReads/')
+    parser.add_argument('--out_dir', 
+        help='Path to out put folder. Default=alignedReads/', 
+        default='alignedReads/')
+    parser.add_argument('--sample_names_file', 
+        help='Text file with sample names. Default=sample_names.txt', 
+        default='sample_names.txt')
+    parser.add_argument('--run', 
+        help='Choose a section of the script to run. Possible options: bismark_alignment; deduplicate_bismark; all. Default=all', 
+        default='all')
     args=parser.parse_args()
 
     # Set path of working directory
     ai=functions.read_analysis_info_file(args.analysis_info_file)
-    path=os.getcwd()
+    path = functions.getWorkingDir(args.analysis_info_file)
 
     #Ncores
     ncores = int(ai['ncores'])
@@ -145,7 +155,8 @@ if __name__ == '__main__':
 
         # Use Parallel to batch the task into groups of ninstances
         # alignments so the cluster is not overloaded.
-        Parallel(n_jobs=ninstances)(delayed(alignment)(i, ai) for i in sampleNames)
+        # Parallel(n_jobs=ninstances)(delayed(alignment)(i, ai) for i in sampleNames)
+        functions.runParallel(alignment, ai)
         # Parallel(n_jobs=ncores)(delayed(alignment)(i, ai) for i in sampleNames)
 
     # Run deduplication
