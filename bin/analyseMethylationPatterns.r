@@ -56,7 +56,7 @@ checkPath(meta.env$sample.group.file, "Sample group file")
 checkPath(meta.env$cov.file.folder, "BedGraph folder")
 checkPath(meta.env$target.region.file, "Genome annotation")
 
-meta.env$tempImagePath = paste0(dirname(meta.env$sample.info.file),"/", meta.env$temp.image.folder, "/")
+meta.env$tempImagePath = paste0(dirname(meta.env$sample.info.file),"/", meta.env$temp.image.folder)
 if(!dir.exists(meta.env$tempImagePath)){
   dir.create(meta.env$tempImagePath)
 }
@@ -204,13 +204,12 @@ func.env$cleanEnvironment = function(){
 
 func.env$runBetaRegression = function(){
   
-  tempImagePath = paste0(dirname(meta.env$sample.info.file),"/", meta.env$temp.image.folder, "/")
-
   cat("Running beta regression across", meta.env$ncores, "instances ...\n")
 
   betaRegressionOnChromosome = function(chunk.name){
 
       inputFile   = paste0(meta.env$tempImagePath, "Chunk", chunk.name, ".Rdata")
+      lockFile    = paste0(meta.env$tempImagePath, "Chunk", chunk.name, ".lck") # Allow multiple nodes
       resultsFile = paste0(meta.env$tempImagePath, "Chunk", chunk.name, ".beta.Rdata")
 
       runRegression = function(obj){
@@ -243,7 +242,13 @@ func.env$runBetaRegression = function(){
 
       # Check if results exist
       if(!file.exists(resultsFile)){
-        runRegression(loadChromosomeChunk(inputFile))
+
+        if(!file.exists(lockFile)){
+
+          file.create(lockFile)
+          runRegression(loadChromosomeChunk(inputFile))
+          file.remove(lockFile)
+        }
       }
   }
 
@@ -283,10 +288,27 @@ func.env$runBetaRegression = function(){
   rm(predictedMeth.split)
   gc()
 
+  # # Set up a job on a second node - if invoking here, it will be limited by srun's core limit
+  # parallelScript = paste(sep="/", script.basename, "parallelBetaRegression.r")
+  # nodeTwoOut = paste0(" > ", meta.env$tempImagePath, "node2.log")
+  # cmd = paste("srun -c", meta.env$ncores, "/usr/bin/Rscript", parallelScript, meta.env$tempImagePath, 
+  #   meta.env$ncores, meta.env$chunk.size, nodeTwoOut , sep=" ")
+  #  cat("Executing:", cmd, "\n")
+  # system( cmd, wait=F)
+
   # Process each chunk in turn
   invisible(lapply(chunk.names, betaRegressionOnChromosome ))
 
   cat("Loading results\n")
+
+  # Wait for all lock file to be removed
+
+
+  locksRemoved = function(){length(list.files(path=meta.env$temp.image.folder, pattern="Chunk\\d+.lck",full.names = T)==0)}
+  while (!locksRemoved()) {
+    Sys.sleep(1)
+  }
+
   betaResults.split   = lapply(chunk.names, loadResultsChunk )
   
   # betaResults.split   = lapply(predictedMeth.split, betaRegressionOnChromosome )
@@ -296,8 +318,6 @@ func.env$runBetaRegression = function(){
 
 func.env$runNullBetaRegression = function(){
   cat("Running resampled beta model regression for null hypothesis across", meta.env$ncores, "instances ...\n")
-
-  tempImagePath = paste0(dirname(meta.env$sample.info.file),"/", meta.env$temp.image.folder, "/")
 
   betaRegressionOnChunk = function(chunk.name){
 
