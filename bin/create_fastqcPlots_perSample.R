@@ -128,12 +128,14 @@ generate_qc_plot = function(files,sample_name,type){
         ylim(0, 100)
     }
 
-    colnames(dat_r1)=c('Base','%G','%A','%T','%C')
+    column.names = c('Base','%G','%A','%T','%C')
+
+    colnames(dat_r1) = column.names
     dat_r1$Base <- factor(dat_r1$Base, as.character(dat_r1$Base))
     dat_r1=melt(dat_r1)
     dat_r1$panel='Read 1'
     if (readType=='pairedEnd'){
-      colnames(dat_r2)=c('Base','%G','%A','%T','%C')
+      colnames(dat_r2) = column.names
       dat_r2$Base <- factor(dat_r2$Base, as.character(dat_r2$Base))
       dat_r2=melt(dat_r2)
       dat_r2$panel='Read 2'
@@ -156,10 +158,10 @@ generate_qc_plot = function(files,sample_name,type){
               legend.position="top", 
               plot.title = element_text(lineheight=.8, face="bold", vjust=-1.5))  + 
         xlab("Position in read")
-        return(p)
+        p
     }
-
-    colnames(dat_r1)=c('Sequence','Content','PValue', 'Obs_Exp_Max', 'Max_Obs_Exp_Position' )
+    column.names = c('Sequence','Content','PValue', 'Obs_Exp_Max', 'Max_Obs_Exp_Position' )
+    colnames(dat_r1) = column.names
     nbases=76
     m=c()
     for (i in 1:6){
@@ -174,7 +176,7 @@ generate_qc_plot = function(files,sample_name,type){
     dat_r1=as.data.frame(m)
     dat_r1$panel='Read 1'
     if (readType=='pairedEnd'){
-      colnames(dat_r2)=c('Sequence','Content','PValue', 'Obs_Exp_Max', 'Max_Obs_Exp_Position' )
+      colnames(dat_r2) = column.names
       nbases=76
       m=c()
       for (i in 1:6){
@@ -200,7 +202,8 @@ generate_qc_plot = function(files,sample_name,type){
       dat$value=round(x = as.numeric(as.character(dat$value)),digits = 0)
       p = makeBasicKmerPlot(dat)
     } 
-    ggsave(filename=paste0(outdir,'/',sample_temp, suffix, '_kmer_content.', plot_device), plot=p, height=3.5, width=10)
+    ggsave(filename=paste0(outdir,'/',sample_temp, suffix, '_kmer_content.', plot_device), 
+      plot=p, height=3.5, width=10)
   }
 
   if (type=='per_base_sequence_quality.txt'){
