@@ -19,7 +19,7 @@ meta.env$sample.info.file   = commandArgs(TRUE)[1]
 meta.env$sample.group.file  = commandArgs(TRUE)[2]
 meta.env$cov.file.folder    = commandArgs(TRUE)[3]
 meta.env$target.region.file = commandArgs(TRUE)[4]
-meta.env$temp.image.folder  = commandArgs(TRUE)[5]
+meta.env$temp.folder.name   = commandArgs(TRUE)[5]
 meta.env$ncores             = as.numeric(commandArgs(TRUE)[6])
 meta.env$chunk.size         = as.numeric(commandArgs(TRUE)[7])
 
@@ -39,9 +39,9 @@ cat("Loading functions ...\n")
 file.arg.name   = "--file="
 script.name     = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
 script.basename = dirname(script.name)
-other.name      = paste(sep="/", script.basename, "functions.r")
+source.name      = paste(sep="/", script.basename, "functions.r")
 
-source(other.name)
+source(source.name)
 
 ##################
 #
@@ -53,12 +53,15 @@ source(other.name)
 # functions::checkPath() will quit if file not found
 checkPath(meta.env$sample.info.file, "Sample name file") 
 checkPath(meta.env$sample.group.file, "Sample group file") 
-checkPath(meta.env$cov.file.folder, "BedGraph folder")
+checkPath(meta.env$cov.file.folder, "Coverage file folder")
 checkPath(meta.env$target.region.file, "Genome annotation")
 
-meta.env$tempImagePath = paste0(dirname(meta.env$sample.info.file),"/", meta.env$temp.image.folder)
-if(!dir.exists(meta.env$tempImagePath)){
-  dir.create(meta.env$tempImagePath)
+
+meta.env$temp.folder.name = ifelse(endsWith(meta.env$temp.folder.name, "/"), meta.env$temp.folder.name, paste0(meta.env$temp.folder.name, "/"))
+
+meta.env$temp.image.path = paste0(dirname(meta.env$sample.info.file),"/", meta.env$temp.folder.name)
+if(!dir.exists(meta.env$temp.image.path)){
+  dir.create(meta.env$temp.image.path)
 }
 
 ##################
@@ -75,8 +78,8 @@ func.env$runOrSkip = function(nextStepTempFile, tempFile, runFunction){
   # nextStepTempFile - the name of the temp file after this step
   # tempFile - the name of the temp file for this step
   # runFunction - the function to be run in this step
-  if(!file.exists(paste0(meta.env$tempImagePath, nextStepTempFile))){
-    tempFile = paste0(meta.env$tempImagePath, tempFile)
+  if(!file.exists(paste0(meta.env$temp.image.path, nextStepTempFile))){
+    tempFile = paste0(meta.env$temp.image.path, tempFile)
     if(file.exists(tempFile)){
       cat("Loading temporary analysis file", tempFile,"...\n")
       RunAndTime( f=function(){load(tempFile, envir = globalenv())} )
@@ -87,8 +90,6 @@ func.env$runOrSkip = function(nextStepTempFile, tempFile, runFunction){
 
       # Only save the data values - ensures updated functions will not be overwritten 
       RunAndTime(f=function(){save(data.env, file = tempFile)})
-      # RunAndTime(f=function(){save(vars.only, file=tempFile)})
-      # RunAndTime(f=function(){save.image(tempFile)})
     }
   }
 }
@@ -142,7 +143,8 @@ func.env$readTargetRegions = function(){
 
   # subset the methylDataRaw object that overlaps the target regions
   methylDataRaw.filter10.rk = subsetByOverlaps(methylDataRaw.filter10, capture.region)
-  assign( "methylDataRaw.filter10.rk", methylDataRaw.filter10.rk, envir=data.env)
+  # assign( "methylDataRaw.filter10.rk", methylDataRaw.filter10.rk, envir=data.env)
+  assign( "methylDataRaw.filter10.rk", methylDataRaw.filter10, envir=data.env) # ignore capture region
   rm(methylDataRaw, envir=data.env) # no longer needed
   rm(methylDataRaw.filter10, envir=data.env) # no longer needed
 }
@@ -164,6 +166,8 @@ func.env$defineCpGClusters = function(){
     max.dist=100, 
     mc.cores=meta.env$ncores)
 
+  assign( "methylDataRaw.filter10.rk.clustered", data.clustered, envir=data.env)
+
   # In the smoothing step CpG sites with high coverages get high weights. To
   # reduce bias due to unusually high coverages we limit the coverage.
   # Default is the 90% quantile
@@ -175,8 +179,6 @@ func.env$defineCpGClusters = function(){
   # the given bandwidth (h)
   cat("Smoothing methylation ...\n")
 
-  # Using multiple cores through slurm does not work here - a single core is spread
-  # across each instance.
   predictedMeth = predictMeth(data.limited, h=meta.env$dmr.bandwidth, mc.cores=meta.env$ncores)
 
   assign( "predictedMeth", predictedMeth, envir=data.env)
@@ -184,7 +186,7 @@ func.env$defineCpGClusters = function(){
   rm(methylDataRaw.filter10.rk, envir=data.env)  #no longer needed
 
   # makeSmoothPlot = function(sample.name){
-  #   png(file=paste0(tempImagePath,"Smoothed methylation", sample.name,".png"),width = 480, height=480)
+  #   png(file=paste0(temp.image.path,"Smoothed methylation", sample.name,".png"),width = 480, height=480)
   #   plotMeth(object.raw = methylDataRaw[,rownames(methylDataRaw)==sample.name], object.rel = predictedMeth[,6], region = region,
   #     lwd.lines = 2,
   #     col.points = "blue",
@@ -193,74 +195,84 @@ func.env$defineCpGClusters = function(){
   # }
 }
 
-func.env$cleanEnvironment = function(){
-  # Remove any unneeded global variables left behind from past runs
-  cat("Cleaning environment...\n")
-  rm(methylDataRaw, envir=data.env)
-  rm(methylDataRaw.filter10, envir=data.env)
-  rm(methylDataRaw.filter10.rk, envir=data.env)
-  rm(capture.region, envir=data.env)
+# func.env$cleanEnvironment = function(){
+#   # Remove any unneeded global variables left behind from past runs
+#   cat("Cleaning environment...\n")
+#   rm(methylDataRaw, envir=data.env)
+#   rm(methylDataRaw.filter10, envir=data.env)
+#   rm(methylDataRaw.filter10.rk, envir=data.env)
+#   rm(capture.region, envir=data.env)
+# }
+
+func.env$betaRegressionOnChunk = function(chunk.name, is.null){
+
+    null.string = ifelse(is.null, ".null", "")
+
+    inputFile   = paste0(meta.env$temp.image.path, "Chunk", chunk.name, null.string, ".Rdata")
+    lockFile    = paste0(meta.env$temp.image.path, "Chunk", chunk.name, null.string, ".lck")
+    resultsFile = paste0(meta.env$temp.image.path, "Chunk", chunk.name, null.string, ".beta.Rdata")
+
+    runRegression = function(obj){
+      cat("Chunk", chunk.name, "with", nrow(obj), "rows\n")
+
+      ptm = proc.time()
+
+      if(is.null){
+        result = betaRegression(formula=~group.null, 
+                      link='probit', 
+                      type='BR', 
+                      object=obj,
+                      mc.cores=meta.env$ncores)
+      } else {
+        result = betaRegression(formula=~Group, 
+                        link='probit', 
+                        type='BR', 
+                        object=obj,
+                        mc.cores=meta.env$ncores)
+      }
+      saveRDS(result, file = resultsFile)
+      PrintTimeTaken(proc.time() - ptm)
+      return()
+    }
+
+    loadChromosomeChunk = function(inputFile) {
+      # Load the saved data chunk with the given name and run regression
+      cat("Loading data chunk", chunk.name, "\n")
+      return(readRDS(inputFile))
+    }
+
+    # Check if results exist
+    if(!file.exists(resultsFile)){
+
+      if(!file.exists(lockFile)){
+
+        file.create(lockFile)
+        runRegression(loadChromosomeChunk(inputFile))
+        file.remove(lockFile)
+      }
+    }
 }
 
 func.env$runBetaRegression = function(){
   
   cat("Running beta regression across", meta.env$ncores, "instances ...\n")
 
-  betaRegressionOnChromosome = function(chunk.name){
-
-      inputFile   = paste0(meta.env$tempImagePath, "Chunk", chunk.name, ".Rdata")
-      lockFile    = paste0(meta.env$tempImagePath, "Chunk", chunk.name, ".lck") # Allow multiple nodes
-      resultsFile = paste0(meta.env$tempImagePath, "Chunk", chunk.name, ".beta.Rdata")
-
-      runRegression = function(obj){
-        cat("Chunk", chunk.name, "with", nrow(obj), "rows\n")
-
-        # To detect the CpG sites where the DNA methylation differs between case
-        # and control samples we model the methylation within a beta regression with
-        # the group as explanatory variable and use the Wald test to test if there is a
-        # group effect
-        # By setting type = "BR" the maximum likelihood with bias reduction is
-        # called.  This is especially useful, when the sample size is small.
-
-        ptm = proc.time()
-        result = betaRegression(formula=~Group, 
-                        link='probit', 
-                        type='BR', 
-                        object=obj,
-                        mc.cores=meta.env$ncores)
-
-        saveRDS(result, file = resultsFile)
-        PrintTimeTaken(proc.time() - ptm)
-        return()
-      }
-
-      loadChromosomeChunk = function(inputFile) {
-        # Load the saved data chunk with the given name and run regression
-        cat("Loading data chunk", chunk.name, "\n")
-        return(readRDS(inputFile))
-      }
-
-      # Check if results exist
-      if(!file.exists(resultsFile)){
-
-        if(!file.exists(lockFile)){
-
-          file.create(lockFile)
-          runRegression(loadChromosomeChunk(inputFile))
-          file.remove(lockFile)
-        }
-      }
-  }
+  # To detect the CpG sites where the DNA methylation differs between case
+  # and control samples we model the methylation within a beta regression with
+  # the group as explanatory variable and use the Wald test to test if there is a
+  # group effect
+  # By setting type = "BR" the maximum likelihood with bias reduction is
+  # called.  This is especially useful, when the sample size is small.
 
   saveChunks = function(chunk.data, chunk.name){
     # Save the given data to the temp dir
-    tempFile = paste0(meta.env$tempImagePath, "Chunk", chunk.name, ".Rdata")
+    tempFile = paste0(meta.env$temp.image.path, "Chunk", chunk.name, ".Rdata")
     saveRDS(chunk.data, file = tempFile)
   }
     
   loadResultsChunk = function(chunk.name) {
     # Load the saved data chunk with the given name and run regression
-    tempFile = paste0(meta.env$tempImagePath, "Chunk", chunk.name, ".beta.Rdata")
+    tempFile = paste0(meta.env$temp.image.path, "Chunk", chunk.name, ".beta.Rdata")
     cat("Loading data chunk for chunk", chunk.name, "\n")
     return(readRDS(tempFile))
   }
@@ -274,7 +286,7 @@ func.env$runBetaRegression = function(){
   #
   # This approach is to save separate data chunks, and process them serially. Also, it still 
   # takes a while, so we save the results of each chunk to file so we can skip them if 
-  # the job gets cancelled and resumed.
+  # the job gets cancelled and resumed, or parallelise across multiple nodes.
   # Based on approach 3 in: https://lcolladotor.github.io/2013/11/14/Reducing-memory-overhead-when-using-mclapply/
   # Given results on nibbler, chunk size of 50000 rows should be ok for more than 40 cores.
   predictedMeth.split = split(data.env$predictedMeth, ceiling(seq_along(data.env$predictedMeth)/meta.env$chunk.size), drop=TRUE)
@@ -282,36 +294,33 @@ func.env$runBetaRegression = function(){
   chunk.names = c(1:length(predictedMeth.split))
 
   # Save out each chunk data
-  cat("Saving", length(chunk.names) , "data chunks to", meta.env$tempImagePath, "\n")
+  cat("Saving", length(chunk.names) , "data chunks to", meta.env$temp.image.path, "\n")
   invisible(mapply(saveChunks, predictedMeth.split, chunk.names))
 
   rm(predictedMeth.split)
   gc()
 
-  # # Set up a job on a second node - if invoking here, it will be limited by srun's core limit
-  # parallelScript = paste(sep="/", script.basename, "parallelBetaRegression.r")
-  # nodeTwoOut = paste0(" > ", meta.env$tempImagePath, "node2.log")
-  # cmd = paste("srun -c", meta.env$ncores, "/usr/bin/Rscript", parallelScript, meta.env$tempImagePath, 
-  #   meta.env$ncores, meta.env$chunk.size, nodeTwoOut , sep=" ")
-  #  cat("Executing:", cmd, "\n")
-  # system( cmd, wait=F)
 
   # Process each chunk in turn
-  invisible(lapply(chunk.names, betaRegressionOnChromosome ))
+  invisible(lapply(chunk.names, func.env$betaRegressionOnChunk, F ))
 
-  cat("Loading results\n")
+  # At this point, you can invoke the parallelBetaRegression.r script on other node(s).
+  # srun <options> /usr/bin/Rscript bin/parallelBetaRegression.r <temp.folder.name> <ncores> <is.null.regression>
+  # Example:
+  # srun -w calculon -c 36 /usr/bin/Rscript bin/parallelBetaRegression.r tmpImages_30core_25k_chunk/ 30 F
 
-  # Wait for all lock file to be removed
-
-
-  locksRemoved = function(){length(list.files(path=meta.env$temp.image.folder, pattern="Chunk\\d+.lck",full.names = T)==0)}
+  # Wait for all lock files to be removed - halts until other nodes finish processing
+  locksRemoved = function(){
+    files = list.files(path=meta.env$temp.folder.name, pattern="Chunk\\d+.lck",full.names = T)
+    length(files)==0
+  }
+  cat("Waiting for other nodes to complete\n")
   while (!locksRemoved()) {
     Sys.sleep(1)
   }
 
+  cat("Loading results\n")
   betaResults.split   = lapply(chunk.names, loadResultsChunk )
-  
-  # betaResults.split   = lapply(predictedMeth.split, betaRegressionOnChromosome )
   betaResults = do.call("rbind", betaResults.split)
   assign( "betaResults", betaResults, envir=data.env)
 }
@@ -319,66 +328,27 @@ func.env$runBetaRegression = function(){
 func.env$runNullBetaRegression = function(){
   cat("Running resampled beta model regression for null hypothesis across", meta.env$ncores, "instances ...\n")
 
-  betaRegressionOnChunk = function(chunk.name){
-
-    # The aim is to detect CpG clusters containing at least one differentially methylated location.
-    # To do so the P values p from the Wald tests are transformed to Z scores which are normally 
-    # distributed under Null hypothesis (no group effect). As cluster test statistic a standardized
-    # Z score average is used. To estimate the standard deviation of the Z scores we have to estimate 
-    # the correlation and hence the variogram of methylation between two CpG sites within a cluster.
-    # The estimation of the standard deviation requires that the distribution of the Z scores 
-    # follows a standard normal distribution.  However, if methylation in both groups differs for 
-    # many CpG sites the density distribution of P values shows a peak near 0.  To ensure that the 
-    # P values are roughly uniformly distributed to get a variance of the Z scores that is Gaussian
-    # with variance 1 we recommend to estimate the variogram (and hence the correlation of Z scores)
-    # under the null hypothesis. To do so we model the beta regression again for resampled data.
-
-      inputFile   = paste0(meta.env$tempImagePath, "Chunk", chunk.name, ".null.Rdata")
-      resultsFile = paste0(meta.env$tempImagePath, "Chunk", chunk.name, ".null.beta.Rdata")
-
-      runRegression = function(obj){
-        cat("Chunk", chunk.name, "with", nrow(obj), "rows\n")
-
-        # To detect the CpG sites where the DNA methylation differs between case
-        # and control samples we model the methylation within a beta regression with
-        # the group as explanatory variable and use the Wald test to test if there is a
-        # group effect
-        # By setting type = "BR" the maximum likelihood with bias reduction is
-        # called.  This is especially useful, when the sample size is small.
-
-        ptm = proc.time()
-        result = betaRegression(formula=~group.null, 
-                        link='probit', 
-                        type='BR', 
-                        object=obj,
-                        mc.cores=meta.env$ncores)
-
-        saveRDS(result, file = resultsFile)
-        PrintTimeTaken(proc.time() - ptm)
-        return()
-      }
-
-      loadChunk = function(inputFile) {
-        # Load the saved data chunk with the given name and run regression
-        cat("Loading data chunk", chunk.name, "\n")
-        return(readRDS(inputFile))
-      }
-
-      # Check if results exist
-      if(!file.exists(resultsFile)){
-        runRegression(loadChunk(inputFile))
-      }
-  }
+  #   # The aim is to detect CpG clusters containing at least one differentially methylated location.
+  #   # To do so the P values p from the Wald tests are transformed to Z scores which are normally 
+  #   # distributed under Null hypothesis (no group effect). As cluster test statistic a standardized
+  #   # Z score average is used. To estimate the standard deviation of the Z scores we have to estimate 
+  #   # the correlation and hence the variogram of methylation between two CpG sites within a cluster.
+  #   # The estimation of the standard deviation requires that the distribution of the Z scores 
+  #   # follows a standard normal distribution.  However, if methylation in both groups differs for 
+  #   # many CpG sites the density distribution of P values shows a peak near 0.  To ensure that the 
+  #   # P values are roughly uniformly distributed to get a variance of the Z scores that is Gaussian
+  #   # with variance 1 we recommend to estimate the variogram (and hence the correlation of Z scores)
+  #   # under the null hypothesis. To do so we model the beta regression again for resampled data.
 
   saveChunks = function(chunk.data, chunk.name){
     # Save the given data to the temp dir
-    tempFile = paste0(meta.env$tempImagePath, "Chunk", chunk.name, ".null.Rdata")
+    tempFile = paste0(meta.env$temp.image.path, "Chunk", chunk.name, ".null.Rdata")
     saveRDS(chunk.data, file = tempFile)
   }
     
   loadResultsChunk = function(chunk.name) {
     # Load the saved data chunk with the given name and run regression
-    tempFile = paste0(meta.env$tempImagePath, "Chunk", chunk.name, ".null.beta.Rdata")
+    tempFile = paste0(meta.env$temp.image.path, "Chunk", chunk.name, ".null.beta.Rdata")
     cat("Loading data chunk for chunk", chunk.name, "\n")
     return(readRDS(tempFile))
   }
@@ -394,21 +364,35 @@ func.env$runNullBetaRegression = function(){
 
   colData(predictedMethNull)$group.null=rep(c(1,2), nrow(colData(predictedMethNull))/2)
 
-  cat("Selected samples for modelling:\n")
-  cat(colData(predictedMethNull))
+  cat("Selected samples for modelling\n")
 
   predictedMethNull.split = split(predictedMethNull, ceiling(seq_along(predictedMethNull)/meta.env$chunk.size), drop=TRUE)
   chunk.names = c(1:length(predictedMethNull.split))
 
   # Save out each chunk data
-  cat("Saving", length(chunk.names) , "data chunks to", meta.env$tempImagePath, "\n")
+  cat("Saving", length(chunk.names) , "data chunks to", meta.env$temp.image.path, "\n")
   invisible(mapply(saveChunks, predictedMethNull.split, chunk.names))
 
   rm(predictedMethNull.split)
   gc()
 
   # Process each chunk in turn
-  invisible(lapply(chunk.names, betaRegressionOnChunk ))
+  invisible(lapply(chunk.names, func.env$betaRegressionOnChunk, T ))
+
+    # At this point, you can invoke the parallelBetaRegression.r script on other node(s).
+  # srun <options> /usr/bin/Rscript bin/parallelBetaRegression.r <temp.folder.name> <ncores> <is.null.regression>
+  # Example:
+  # srun -w calculon -c 36 /usr/bin/Rscript bin/parallelBetaRegression.r tmpImages_30core_25k_chunk/ 30 T
+
+  # Wait for all lock files to be removed - halts until other nodes finish processing
+  locksRemoved = function(){
+    files = list.files(path=meta.env$temp.folder.name, pattern="Chunk\\d+.null.lck",full.names = T)
+    length(files)==0
+  }
+  cat("Waiting for other nodes to complete\n")
+  while (!locksRemoved()) {
+    Sys.sleep(1)
+  }
 
   cat("Loading results\n")
   betaResultsNull.split   = lapply(chunk.names, loadResultsChunk )
@@ -420,10 +404,9 @@ func.env$runNullBetaRegression = function(){
   vario = makeVariogram(betaResultsNull)
 
   assign( "vario", vario, envir=data.env)
-  # save.image(paste0(tempImagePath, "Null_variogram.RData")) # save workspace
 
   # Plot the variogram
-  png(file=paste0(meta.env$tempImagePath,"Null_variogram.png"),width = 480, height=480)
+  png(file=paste0(meta.env$temp.image.path,"Null_variogram.png"),width = 480, height=480)
   plot(vario$variogram$v)
   dev.off()
 }
@@ -432,7 +415,7 @@ func.env$smoothValues = function(){
   cat('Smoothing\n')
   ## Break, and call new script with desired sill value, or continue with default sill of 1?
   ## sill_value= readline("What is the value of sill to use (0 to 1)? please check graph ")
-  sill_value= 1
+  sill_value= 0.18
 
   # It is necessary to smooth the variogram. Especially for greater h the variogram 
   # tends to oscillate strongly. This is the reason why the default bandwidth 
@@ -449,14 +432,14 @@ func.env$smoothValues = function(){
   assign( "vario.sm", vario.sm, envir=data.env)
 
   # Plot the smoothed variogram
-  png(file=paste0(meta.env$tempImagePath,"Smooth_variogram.png"),width = 480, height=480)
+  png(file=paste0(meta.env$temp.image.path,"Smooth_variogram.png"),width = 480, height=480)
   plot(data.env$vario$variogram$v)
   lines(vario.sm$variogram[,c("h", "v.sm")], col = "red", lwd = 1.5)
   dev.off()
 
   # Replace the pValsList object (which consists of the test results of the
   # resampled data) by the test results of interest (for group effect):
-  vario.aux = makeVariogram(betaResults, make.variogram=F)
+  vario.aux = makeVariogram(data.env$betaResults, make.variogram=F)
   vario.sm$pValsList  = vario.aux$pValsList
 
   # vario.sm now contains the smoothed variogram under the Null hypothesis
@@ -529,19 +512,19 @@ func.env$findOverlapsWithGTF = function(){
   assign( "DMRs.annotated", DMRs.annotated, envir=data.env)
   assign( "DMRs.annotated.kit", DMRs.annotated.kit, envir=data.env)
 
-  write.table(file=paste0(meta.env$tempImagePath, "DMRs_annotated_kit.tsv"),   sep="\t",row.names = F, DMRs.annotated.kit)
-  write.table(file=paste0(meta.env$tempImagePath, "DMRs_annotated_genes.tsv"), sep="\t",row.names = F, DMRs.annotated)
+  write.table(file=paste0(meta.env$temp.image.path, "DMRs_annotated_kit.tsv"),   sep="\t",row.names = F, DMRs.annotated.kit)
+  write.table(file=paste0(meta.env$temp.image.path, "DMRs_annotated_genes.tsv"), sep="\t",row.names = F, DMRs.annotated)
 }
 
 func.env$plotDMRs = function(){
-
+  cat("Plotting DMRs\n")
   outputDir = paste0(dirname(meta.env$sample.info.file),"/DMR_images/")
   if(!dir.exists(outputDir)){
     dir.create(outputDir)
   }
 
   for (i in 1:length(data.env$DMRs)){
-    temp = subsetByOverlaps(predictedMeth, data.env$DMRs[i])
+    temp = subsetByOverlaps(data.env$predictedMeth, data.env$DMRs[i])
     t2   = rowRanges(temp) %>% as.data.frame
     t2   = cbind(index=as.numeric(rownames(t2)), t2)
     t2$seqnames2 = paste0(t2$seqnames, '_', t2$start)
@@ -556,8 +539,8 @@ func.env$plotDMRs = function(){
     df = left_join(df,as.data.frame(colData(temp)), by='Sample.Name')
     df = left_join(df,t2,by='index')
 
-    positions = rowRanges(subsetByOverlaps(data.env$methylDataRaw.filter10.rk.clustered,data.env$DMRs[i])) %>% as.data.frame
-    coverages = totalReads(subsetByOverlaps(data.env$methylDataRaw.filter10.rk.clustered,data.env$DMRs[i])) %>% as.data.frame
+    positions = rowRanges(subsetByOverlaps(data.env$methylDataRaw.filter10.rk.clustered,  data.env$DMRs[i])) %>% as.data.frame
+    coverages = totalReads(subsetByOverlaps(data.env$methylDataRaw.filter10.rk.clustered, data.env$DMRs[i])) %>% as.data.frame
     positions = cbind(index=rownames(positions), positions)
     coverages = cbind(index=rownames(coverages), coverages)
     coverages = melt(coverages)
@@ -588,10 +571,10 @@ func.env$plotDMRs = function(){
 ##################
 
 # The order in which functions should be run
-func.env$func.order = c(func.env$readSamples, func.env$readTargetRegions, func.env$defineCpGClusters, func.env$cleanEnvironment, func.env$runBetaRegression,
+func.env$func.order = c(func.env$readSamples, func.env$readTargetRegions, func.env$defineCpGClusters, func.env$runBetaRegression,
   func.env$runNullBetaRegression, func.env$smoothValues, func.env$findOverlapsWithGTF, func.env$plotDMRs)
 # The corresponding save points
-func.env$func.names = c("Read_files.RData", "Filtered_methylation.RData", "Predicted_methylation.RData", "Cleaned.RData", "Beta_regression.RData",
+func.env$func.names = c("Read_files.RData", "Filtered_methylation.RData", "Predicted_methylation.RData", "Beta_regression.RData",
   "Beta_regression_null.RData", "DMRs_found.RData", "Overlaps_with_GTF.RData", "DMRs.RData", "end.RData")
 
 for( i in 1:length(func.env$func.order)){
