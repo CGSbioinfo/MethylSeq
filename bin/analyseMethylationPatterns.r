@@ -1,5 +1,5 @@
 # Perform differential methylation analysis using BiSeq.
-# Extended comments are copied from the BiSeq guide:
+# Extended comments are mostly copied from the BiSeq guide:
 # https://www.bioconductor.org/packages/devel/bioc/vignettes/BiSeq/inst/doc/BiSeq.pdf
 
 cat("Loading R packages ...\n")
@@ -22,10 +22,8 @@ meta.env$target.region.file = commandArgs(TRUE)[4]
 meta.env$temp.folder.name   = commandArgs(TRUE)[5]
 meta.env$ncores             = as.numeric(commandArgs(TRUE)[6])
 meta.env$chunk.size         = as.numeric(commandArgs(TRUE)[7])
-
-meta.env$dmr.bandwidth = 50
-
-meta.env$gtf.file = '/mnt/cgs-fs3/Sequencing/Genome/Pig/ensembl/gtf/Sscrofa10.2/release-85/Sus_scrofa.Sscrofa10.2.85.gtf'
+meta.env$gtf.file           = commandArgs(TRUE)[8]
+meta.env$dmr.bandwidth      = as.numeric(commandArgs(TRUE)[9])
 
 ##################
 #
@@ -54,8 +52,8 @@ source(source.name)
 checkPath(meta.env$sample.info.file, "Sample name file") 
 checkPath(meta.env$sample.group.file, "Sample group file") 
 checkPath(meta.env$cov.file.folder, "Coverage file folder")
-checkPath(meta.env$target.region.file, "Genome annotation")
-
+checkPath(meta.env$target.region.file, "Target region file")
+checkPath(meta.env$gtf.file, "Gene annotation file")
 
 meta.env$temp.folder.name = ifelse(endsWith(meta.env$temp.folder.name, "/"), meta.env$temp.folder.name, paste0(meta.env$temp.folder.name, "/"))
 
@@ -108,12 +106,12 @@ func.env$readSamples = function(){
 
   # Locate coverage files
   cat("Locating cov files ...\n")
-  listMethylFile = list.files(path=meta.env$cov.file.folder,pattern=".cov",full.names = T)
-  listMethylFile = grep(paste0(c(as.character(sampleGroups$Sample.Name)),collapse='|'),
-      listMethylFile, value=TRUE)
+  cov.file.list = list.files(path=meta.env$cov.file.folder,pattern=".cov",full.names = T)
+  cov.file.list = grep(paste0(c(as.character(sampleGroups$Sample.Name)),collapse='|'),
+      cov.file.list, value=TRUE)
 
-  print(listMethylFile, collapse="\n\t")
-  methylDataRaw = readBismark(listMethylFile, sampleGroups)
+  print(cov.file.list, collapse="\n\t")
+  methylDataRaw = readBismark(cov.file.list, sampleGroups)
   assign( "methylDataRaw", methylDataRaw, envir=data.env)
 }
 
@@ -138,13 +136,13 @@ func.env$readTargetRegions = function(){
 
   capture.region$region = paste0('region_', 1:length(capture.region))
 
-  #if you want to change the minimum coverage, change the minCov setting in the line below
+
   methylDataRaw.filter10 = filterByCov(data.env$methylDataRaw, minCov=10, global=F)
 
   # subset the methylDataRaw object that overlaps the target regions
   methylDataRaw.filter10.rk = subsetByOverlaps(methylDataRaw.filter10, capture.region)
   # assign( "methylDataRaw.filter10.rk", methylDataRaw.filter10.rk, envir=data.env)
-  assign( "methylDataRaw.filter10.rk", methylDataRaw.filter10, envir=data.env) # ignore capture region
+  assign( "methylDataRaw.filter10.rk", methylDataRaw.filter10.rk, envir=data.env) # ignore capture region
   rm(methylDataRaw, envir=data.env) # no longer needed
   rm(methylDataRaw.filter10, envir=data.env) # no longer needed
 }
@@ -179,7 +177,50 @@ func.env$defineCpGClusters = function(){
   # the given bandwidth (h)
   cat("Smoothing methylation ...\n")
 
-  predictedMeth = predictMeth(data.limited, h=meta.env$dmr.bandwidth, mc.cores=meta.env$ncores)
+  # This step does not properly use multiple cores. Each instance is mostly sleeping,
+  # with cpu time spent managing the processes. Time to run:
+
+  # Slurm? Cores   Time      Note
+  # Yes    30       03:11:19 Using 100% of one core, all in kernel mode.No target region filtering.
+  # Yes    6        00:39:12 Using 100% of one core
+  # No     6        00:36:13 Using 100% of one core
+  # No     1        01:46:03 Using ~23% of one core. Jobs alternate between running and sleeping. About 40mins of cpu time.
+  # Yes    1        02:11:33 Using ~25% of one core
+  #
+  # I think the problem is that mc.preschedule=FALSE in the mclapply call; one job is forked for each value of the data object,
+  # rather than splitting the job into ncores batches. From mclapply documentation on mc.preschedule:
+    # if set to TRUE then the computation is first divided to (at most) as many jobs are there are cores and then the jobs are started, 
+    # each job possibly covering more than one value. Better for short computations or large number of values in X.
+    # If set to FALSE then one job is forked for each value of X. 
+    # Better for jobs that have high variance of completion time and not too many values of X compared to mc.cores.
+
+  # This means that we should be able to speed this up by presplitting the data.limited object and running as new system calls 
+  # up to floor(ncores-1) instances
+  # data.limited.split = split(data.limited, ceiling(seq_along(data.limited)/meta.env$ncores), drop=TRUE)
+  # # Save each chunk
+  # saveChunks = function(chunk.data, chunk.name){
+  #   tempFile = paste0(meta.env$temp.image.path, "Limited", chunk.name, ".Rdata")
+  #   saveRDS(chunk.data, file = tempFile)
+  # }
+  # cat("Saving", length(chunk.names) , "data chunks to", meta.env$temp.image.path, "\n")
+  # invisible(mapply(saveChunks, data.limited.split, chunk.names))
+  # rm(data.limited.split)
+
+  # runPrediction = function(chunk.name){
+  #   tempFile = paste0(meta.env$temp.image.path, "Limited", chunk.name, ".result.Rdata")
+  #   data     = readRDS(tempFile)
+  #   result  = predictMeth(data, h=meta.env$dmr.bandwidth, mc.cores=6)
+  #   saveRDS(result, file = tempFile)
+  #   # This will save a BSRel object to file
+  # }
+  # command = "srun -c 1 /usr/bin/Rscript"
+  # system(command, wait = FALSE)
+
+  # Test the affinity mask of the process
+  # system(sprintf("taskset -p 0xffffffff %d", Sys.getpid()))
+  predictedMeth = predictMeth(data.limited, h=meta.env$dmr.bandwidth, mc.cores=6)
+
+
 
   assign( "predictedMeth", predictedMeth, envir=data.env)
 
@@ -194,15 +235,6 @@ func.env$defineCpGClusters = function(){
   #   dev.off()
   # }
 }
-
-# func.env$cleanEnvironment = function(){
-#   # Remove any unneeded global variables left behind from past runs
-#   cat("Cleaning environment...\n")
-#   rm(methylDataRaw, envir=data.env)
-#   rm(methylDataRaw.filter10, envir=data.env)
-#   rm(methylDataRaw.filter10.rk, envir=data.env)
-#   rm(capture.region, envir=data.env)
-# }
 
 func.env$betaRegressionOnChunk = function(chunk.name, is.null){
 
@@ -279,26 +311,42 @@ func.env$runBetaRegression = function(){
    
 
   # Beta regression takes *forever* if run on a small number of cores. While the task
-  # itself is embarassingly parallel, the limit was the memory in use
-  # at the point mclapply gets invoked (~44Gb per instance with the methylDataRaw object loaded). Any object not
-  # modified during a fork() should share memory between parent and child, so we need to 
-  # minimise the size of the data being modified.
+  # itself is embarassingly parallel, a limit is the memory in use at the point
+  # mclapply gets invoked. Any object not modified during a UNIX fork() should share 
+  # memory between parent and child, but in this case the methylDataRaw object is
+  # copied if present (and it is the largest object in memory by far).
   #
-  # This approach is to save separate data chunks, and process them serially. Also, it still 
-  # takes a while, so we save the results of each chunk to file so we can skip them if 
-  # the job gets cancelled and resumed, or parallelise across multiple nodes.
-  # Based on approach 3 in: https://lcolladotor.github.io/2013/11/14/Reducing-memory-overhead-when-using-mclapply/
-  # Given results on nibbler, chunk size of 50000 rows should be ok for more than 40 cores.
-  predictedMeth.split = split(data.env$predictedMeth, ceiling(seq_along(data.env$predictedMeth)/meta.env$chunk.size), drop=TRUE)
+  # 1) Minimise the size of the data being modified by removing unneeded variables from data.env.
+  #    This allows more parallel instances within the node.
+  # 
+  # 2) Serialise the data into chunks. This allows them to be processed by multiple nodes.
+  #    Based on approach 3 in: https://lcolladotor.github.io/2013/11/14/Reducing-memory-overhead-when-using-mclapply/
+  #
+  # Within a node, each chunk will take as long as the longest core time. When setting the chunk size, 
+  # consider the tradeoff between loading a new chunk, and the cpu downtime waiting for the last core to complete.
+  # In tests, a chunk size of 25000 was optimal for a dataset of ~250k rows of 6 samples at both 30 and 36 cores.
+  # Before the chunking was added, the script ran for seven days on 6 cores before the job was killed 
+  # when the cluster was shut down. Benchmarking 20 cores or lower has not been completed.
+  nchunks     = ceiling(length(data.env$predictedMeth)/meta.env$chunk.size)
+  chunk.names = c(1:nchunks)
 
-  chunk.names = c(1:length(predictedMeth.split))
+  
+  chunksSaved = function(){
+    # This is a very basic test - it checks if the number of chunks present matches the expected
+    # number of chunks. This will fail if chunk size is decreased between runs.
+    length(list.files(path=meta.env$temp.folder.name, pattern="Chunk\\d+.Rdata",full.names = T))==nchunks
+  }
 
-  # Save out each chunk data
-  cat("Saving", length(chunk.names) , "data chunks to", meta.env$temp.image.path, "\n")
-  invisible(mapply(saveChunks, predictedMeth.split, chunk.names))
+  if(chunksSaved()){
+    cat("Reading existing", nchunks , "data chunks\n")
+  } else {
+    cat("Saving", nchunks , "data chunks to", meta.env$temp.image.path, "\n")
+    predictedMeth.split = split(data.env$predictedMeth, ceiling(seq_along(data.env$predictedMeth)/meta.env$chunk.size), drop=TRUE)
+    invisible(mapply(saveChunks, predictedMeth.split, chunk.names))
+  }
 
   rm(predictedMeth.split)
-  gc()
+  # gc()
 
 
   # Process each chunk in turn
@@ -366,15 +414,33 @@ func.env$runNullBetaRegression = function(){
 
   cat("Selected samples for modelling\n")
 
-  predictedMethNull.split = split(predictedMethNull, ceiling(seq_along(predictedMethNull)/meta.env$chunk.size), drop=TRUE)
-  chunk.names = c(1:length(predictedMethNull.split))
+  nchunks     = ceiling(length(data.env$predictedMethNull)/meta.env$chunk.size)
+  chunk.names = c(1:nchunks)
 
-  # Save out each chunk data
-  cat("Saving", length(chunk.names) , "data chunks to", meta.env$temp.image.path, "\n")
-  invisible(mapply(saveChunks, predictedMethNull.split, chunk.names))
+  
+  chunksSaved = function(){
+    # This is a very basic test - it checks if the number of chunks present matches the expected
+    # number of chunks. This will fail if chunk size is decreased between runs.
+    length(list.files(path=meta.env$temp.folder.name, pattern="Chunk\\d+.null.Rdata",full.names = T))==nchunks
+  }
+
+  if(chunksSaved()){
+    cat("Reading existing", nchunks , "data chunks\n")
+  } else {
+    cat("Saving", nchunks , "data chunks to", meta.env$temp.image.path, "\n")
+    predictedMethNull.split = split(data.env$predictedMethNull, ceiling(seq_along(data.env$predictedMethNull)/meta.env$chunk.size), drop=TRUE)
+    invisible(mapply(saveChunks, predictedMethNull.split, chunk.names))
+  }
+
+  # predictedMethNull.split = split(predictedMethNull, ceiling(seq_along(predictedMethNull)/meta.env$chunk.size), drop=TRUE)
+  # chunk.names = c(1:length(predictedMethNull.split))
+
+  # # Save out each chunk data
+  # cat("Saving", length(chunk.names) , "data chunks to", meta.env$temp.image.path, "\n")
+  # invisible(mapply(saveChunks, predictedMethNull.split, chunk.names))
 
   rm(predictedMethNull.split)
-  gc()
+  # gc()
 
   # Process each chunk in turn
   invisible(lapply(chunk.names, func.env$betaRegressionOnChunk, T ))
@@ -473,7 +539,7 @@ func.env$smoothValues = function(){
 
 func.env$findOverlapsWithGTF = function(){
   cat('Finding overlaps with GTF genes\n')
-  ##Plot DMRs
+
   merge_hits=function(x){
     data.frame(seqnames=x$seqnames[1], start=x$start[1], end=x$end[1], width=x$width[1],
                          median.p=x$median.p[1],
@@ -483,12 +549,9 @@ func.env$findOverlapsWithGTF = function(){
                          annotation=paste(x$annotation, collapse=' | '))
   }
 
-  # loading annotation, if using different kit/annotation resources, please change to the correct path
+
   GTF     = import.gff(meta.env$gtf.file, format="gtf",feature.type="gene")
   bed.kit = import.bed(meta.env$target.region.file)
-
-  assign( "GTF", GTF, envir=data.env)
-  assign( "bed.kit", bed.kit, envir=data.env)
 
   tempoverlap1     = findOverlaps(data.env$DMRs, GTF)
   tempoverlap1.kit = findOverlaps(data.env$DMRs, bed.kit)
@@ -509,22 +572,18 @@ func.env$findOverlapsWithGTF = function(){
   DMRs.annotated     = tempoverlap2 %>% group_by(seqnames2) %>% do(merge_hits(.)) %>% as.data.frame
   DMRs.annotated.kit = tempoverlap2.kit %>% group_by(seqnames2) %>% do(merge_hits(.)) %>% as.data.frame
 
-  assign( "DMRs.annotated", DMRs.annotated, envir=data.env)
-  assign( "DMRs.annotated.kit", DMRs.annotated.kit, envir=data.env)
-
   write.table(file=paste0(meta.env$temp.image.path, "DMRs_annotated_kit.tsv"),   sep="\t",row.names = F, DMRs.annotated.kit)
   write.table(file=paste0(meta.env$temp.image.path, "DMRs_annotated_genes.tsv"), sep="\t",row.names = F, DMRs.annotated)
-}
 
-func.env$plotDMRs = function(){
   cat("Plotting DMRs\n")
   outputDir = paste0(dirname(meta.env$sample.info.file),"/DMR_images/")
   if(!dir.exists(outputDir)){
     dir.create(outputDir)
   }
 
-  for (i in 1:length(data.env$DMRs)){
-    temp = subsetByOverlaps(data.env$predictedMeth, data.env$DMRs[i])
+  plotDMR = function(dmr.data){
+
+    temp = subsetByOverlaps(data.env$predictedMeth, dmr.data)
     t2   = rowRanges(temp) %>% as.data.frame
     t2   = cbind(index=as.numeric(rownames(t2)), t2)
     t2$seqnames2 = paste0(t2$seqnames, '_', t2$start)
@@ -532,15 +591,15 @@ func.env$plotDMRs = function(){
 
     annot = rowRanges(temp)
     annot$seqnames2 = paste0(seqnames(annot), '_', start(annot))
-    annot = left_join(as.data.frame(annot), data.env$DMRs.annotated,by='seqnames2')
+    annot = left_join(as.data.frame(annot), DMRs.annotated,by='seqnames2')
     annot = paste0(annot[complete.cases(annot),]$annotation, collapse= ' \n ')
 
     colnames(df) = c('index','Sample.Name','methLevel')
     df = left_join(df,as.data.frame(colData(temp)), by='Sample.Name')
     df = left_join(df,t2,by='index')
 
-    positions = rowRanges(subsetByOverlaps(data.env$methylDataRaw.filter10.rk.clustered,  data.env$DMRs[i])) %>% as.data.frame
-    coverages = totalReads(subsetByOverlaps(data.env$methylDataRaw.filter10.rk.clustered, data.env$DMRs[i])) %>% as.data.frame
+    positions = rowRanges(subsetByOverlaps(data.env$methylDataRaw.filter10.rk.clustered,  dmr.data)) %>% as.data.frame
+    coverages = totalReads(subsetByOverlaps(data.env$methylDataRaw.filter10.rk.clustered, dmr.data)) %>% as.data.frame
     positions = cbind(index=rownames(positions), positions)
     coverages = cbind(index=rownames(coverages), coverages)
     coverages = melt(coverages)
@@ -562,6 +621,8 @@ func.env$plotDMRs = function(){
     #change those 2 lines to change the location where the graphs are saved.
     ggsave(plot=p, filename=paste0(outputDir, 'DMR_',df$seqnames2[1],'.png'))
   }
+
+  invisible(lapply(data.env$DMRs, plotDMR))
 }
 
 ##################
@@ -572,10 +633,10 @@ func.env$plotDMRs = function(){
 
 # The order in which functions should be run
 func.env$func.order = c(func.env$readSamples, func.env$readTargetRegions, func.env$defineCpGClusters, func.env$runBetaRegression,
-  func.env$runNullBetaRegression, func.env$smoothValues, func.env$findOverlapsWithGTF, func.env$plotDMRs)
+  func.env$runNullBetaRegression, func.env$smoothValues, func.env$findOverlapsWithGTF)
 # The corresponding save points
 func.env$func.names = c("Read_files.RData", "Filtered_methylation.RData", "Predicted_methylation.RData", "Beta_regression.RData",
-  "Beta_regression_null.RData", "DMRs_found.RData", "Overlaps_with_GTF.RData", "DMRs.RData", "end.RData")
+  "Beta_regression_null.RData", "DMRs_found.RData", "Overlaps_with_GTF.RData", "end.RData")
 
 for( i in 1:length(func.env$func.order)){
   thisFile = func.env$func.names[i]

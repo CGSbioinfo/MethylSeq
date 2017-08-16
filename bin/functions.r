@@ -34,7 +34,8 @@ PrintTimeTaken = function(proc.time.object){
 
 RunAndTime = function(f){
     # Run the given function and print
-    # the time it took to complete
+    # the time it took to complete. Returns
+    # the return value of f.
     #
     # f - the function to run
     if(!is.function(f)){
@@ -42,8 +43,9 @@ RunAndTime = function(f){
         return()
     }
     ptm = proc.time()
-    f()
+    r = f()
     PrintTimeTaken(proc.time() - ptm)
+    r
 }
 
 PrintEnvironmentSize = function(){
