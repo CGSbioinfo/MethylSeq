@@ -1,20 +1,39 @@
 library(ggplot2)
 library(reshape)
 
-in_dir=commandArgs(TRUE)[1]
-sample_names=commandArgs(TRUE)[2]
-pattern=commandArgs(TRUE)[3]
-outdir=commandArgs(TRUE)[4]
+in_dir      = commandArgs(TRUE)[1]
+sample.file = commandArgs(TRUE)[2]
+pattern     = commandArgs(TRUE)[3]
+outdir      = commandArgs(TRUE)[4]
+
+#' This function loads the external functions file.
+#' @title Load external functions
+#' @export
+loadFunctionsFile = function(){
+  cat("Loading functions ...\n")
+  file.arg.name = "--file="
+  script.name   = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
+  script.folder = dirname(script.name)
+  script.to.load = paste(sep="/", script.folder, "functions.r")
+  source(script.to.load)
+}
+
+loadFunctionsFile()
 
 # Create outdir
 dir.create(outdir, recursive=TRUE, showWarning=FALSE)
 
 # Read data
-allFiles=list.files(in_dir, recursive=TRUE, pattern=pattern)
-sample_names=as.character(read.csv(sample_names, header=FALSE)[,1])
+allFiles     = list.files(in_dir, recursive=TRUE, pattern=pattern)
+sample_names = as.character(read.csv(sample.file, header=FALSE)[,1])
 
 data_alignment=data.frame(matrix(ncol=6))
-colnames(data_alignment)=c("Sequence pairs analysed in total:","Number of paired-end alignments with a unique best hit:","Mapping efficiency:" ,"Sequence pairs with no alignments under any condition:","Sequence pairs did not map uniquely:","Sequence pairs which were discarded because genomic sequence could not be extracted:")
+colnames(data_alignment)=c("Sequence pairs analysed in total:",
+	"Number of paired-end alignments with a unique best hit:",
+	"Mapping efficiency:" ,
+	"Sequence pairs with no alignments under any condition:",
+	"Sequence pairs did not map uniquely:",
+	"Sequence pairs which were discarded because genomic sequence could not be extracted:")
 
 data_aligned_pairs=data.frame(matrix(ncol=4))
 colnames(data_aligned_pairs)=c("converted top strand","complementary to converted top strand","complementary to converted bottom strand","converted bottom strand")

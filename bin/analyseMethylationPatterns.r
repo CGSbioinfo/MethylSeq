@@ -18,28 +18,26 @@ func.env = new.env() # functions defined in this file
 meta.env$sample.info.file   = commandArgs(TRUE)[1]
 meta.env$sample.group.file  = commandArgs(TRUE)[2]
 meta.env$cov.file.folder    = commandArgs(TRUE)[3]
-meta.env$target.region.file = commandArgs(TRUE)[4]
+meta.env$target.region.file = commandArgs(TRUE)[4] # Can be NA
 meta.env$temp.folder.name   = commandArgs(TRUE)[5]
 meta.env$ncores             = as.numeric(commandArgs(TRUE)[6])
 meta.env$chunk.size         = as.numeric(commandArgs(TRUE)[7])
 meta.env$gtf.file           = commandArgs(TRUE)[8]
 meta.env$dmr.bandwidth      = as.numeric(commandArgs(TRUE)[9])
 
-##################
-#
-# Load external 
-# functions
-#
-##################
+#' This function loads the external functions file.
+#' @title Load external functions
+#' @export
+loadFunctionsFile = function(){
+  cat("Loading functions ...\n")
+  file.arg.name = "--file="
+  script.name   = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
+  script.folder = dirname(script.name)
+  script.to.load = paste(sep="/", script.folder, "functions.r")
+  source(script.to.load)
+}
 
-cat("Loading functions ...\n")
-
-file.arg.name   = "--file="
-script.name     = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
-script.basename = dirname(script.name)
-source.name      = paste(sep="/", script.basename, "functions.r")
-
-source(source.name)
+loadFunctionsFile()
 
 ##################
 #
@@ -49,18 +47,32 @@ source(source.name)
 ##################
 
 # functions::checkPath() will quit if file not found
-checkPath(meta.env$sample.info.file, "Sample name file") 
-checkPath(meta.env$sample.group.file, "Sample group file") 
-checkPath(meta.env$cov.file.folder, "Coverage file folder")
-checkPath(meta.env$target.region.file, "Target region file")
-checkPath(meta.env$gtf.file, "Gene annotation file")
+pathExistsOrQuit(meta.env$sample.info.file, "Sample name file") 
+pathExistsOrQuit(meta.env$sample.group.file, "Sample group file") 
+pathExistsOrQuit(meta.env$cov.file.folder, "Coverage file folder")
+pathExistsOrQuit(meta.env$gtf.file, "Gene annotation file")
 
-meta.env$temp.folder.name = ifelse(endsWith(meta.env$temp.folder.name, "/"), meta.env$temp.folder.name, paste0(meta.env$temp.folder.name, "/"))
+if(meta.env$target.region.file=='NA'){
+  meta.env$target.region.file=NA
+}
+
+if(!is.na(meta.env$target.region.file)){
+  pathExistsOrQuit(meta.env$target.region.file, "Target region file")
+}
+
+meta.env$temp.folder.name = ifelse(endsWith(meta.env$temp.folder.name, "/"), 
+  meta.env$temp.folder.name, 
+  paste0(meta.env$temp.folder.name, "/"))
 
 meta.env$temp.image.path = paste0(dirname(meta.env$sample.info.file),"/", meta.env$temp.folder.name)
 if(!dir.exists(meta.env$temp.image.path)){
   dir.create(meta.env$temp.image.path)
 }
+
+meta.env$server = system("hostname", intern = TRUE)
+
+meta.env$log.file = paste0(meta.env$temp.image.path, "log.txt")
+cat("Running main on", meta.env$server, "\n", file=meta.env$log.file, append=TRUE)
 
 ##################
 #
@@ -68,26 +80,27 @@ if(!dir.exists(meta.env$temp.image.path)){
 #
 ##################
 
+#' Check if the next analysis step output exists. If so, skip 
+#' this analysis step. If not, check if this step's output exists
+#' and if not, run the analysis.
+#' @title Run or skip analysis step
+#' @param nextStepTempFile the name of the temp file after this step
+#' @param tempFile the name of the temp file for this step
+#' @param runFunction the function to be run in this step
+#' @export
 func.env$runOrSkip = function(nextStepTempFile, tempFile, runFunction){
-  # Check if the next analysis step output exists. If so, skip 
-  # this analysis step. If not, check if this step's output exists
-  # and if not, run the analysis.
-  #
-  # nextStepTempFile - the name of the temp file after this step
-  # tempFile - the name of the temp file for this step
-  # runFunction - the function to be run in this step
   if(!file.exists(paste0(meta.env$temp.image.path, nextStepTempFile))){
     tempFile = paste0(meta.env$temp.image.path, tempFile)
     if(file.exists(tempFile)){
       cat("Loading temporary analysis file", tempFile,"...\n")
-      RunAndTime( f=function(){load(tempFile, envir = globalenv())} )
+      runAndTime( f=function(){load(tempFile, envir = globalenv())} )
       cat("Loaded temporary analysis file", tempFile,"...\n")
     } else{
       RunAndTime(runFunction)
       cat("Saving temporary analysis file", tempFile, "...\n")
 
       # Only save the data values - ensures updated functions will not be overwritten 
-      RunAndTime(f=function(){save(data.env, file = tempFile)})
+      runAndTime(f=function(){save(data.env, file = tempFile)})
     }
   }
 }
@@ -119,10 +132,16 @@ func.env$readTargetRegions = function(){
   # Read target region annotations
   cat('Reading target regions\n')
 
-  capture.region = import.bed(meta.env$target.region.file)
+  methylDataRaw.filter10 = filterByCov(data.env$methylDataRaw, minCov=10, global=F)
 
-  # Merge overlapping regions
-  capture.region<-reduce(capture.region) %>% # region distribution: distance between regions and region size
+  # Do not filter if no target was provided
+  if(is.na(meta.env$target.region.file)){
+    methylDataRaw.filter10.rk = methylDataRaw.filter10
+  } else {
+    capture.region = import.bed(meta.env$target.region.file)
+
+    # Merge overlapping regions
+    capture.region<-reduce(capture.region) %>% # region distribution: distance between regions and region size
     as.data.frame %>%
     arrange(seqnames, start) %>% # sort the regions by chromosome (seqnames)and start position
     group_by(seqnames) %>%  # calculate distance between regions
@@ -130,17 +149,16 @@ func.env$readTargetRegions = function(){
     group_by(seqnames) %>% 
     mutate(size=end-start)  # Calculate size of each region
 
-  capture.region = GRanges(seqnames=capture.region$seqnames,
-    IRanges(start=capture.region$start, end=capture.region$end),
+    capture.region = GRanges(seqnames=capture.region$seqnames,
+      IRanges(start=capture.region$start, end=capture.region$end),
                               strand=capture.region$strand, dist = capture.region$dist, size= capture.region$size)
 
-  capture.region$region = paste0('region_', 1:length(capture.region))
+    capture.region$region = paste0('region_', 1:length(capture.region))
 
-
-  methylDataRaw.filter10 = filterByCov(data.env$methylDataRaw, minCov=10, global=F)
-
-  # subset the methylDataRaw object that overlaps the target regions
-  methylDataRaw.filter10.rk = subsetByOverlaps(methylDataRaw.filter10, capture.region)
+    # subset the methylDataRaw object that overlaps the target regions
+    methylDataRaw.filter10.rk = subsetByOverlaps(methylDataRaw.filter10, capture.region)
+  }
+ 
   # assign( "methylDataRaw.filter10.rk", methylDataRaw.filter10.rk, envir=data.env)
   assign( "methylDataRaw.filter10.rk", methylDataRaw.filter10.rk, envir=data.env) # ignore capture region
   rm(methylDataRaw, envir=data.env) # no longer needed
@@ -263,7 +281,8 @@ func.env$betaRegressionOnChunk = function(chunk.name, is.null){
                         mc.cores=meta.env$ncores)
       }
       saveRDS(result, file = resultsFile)
-      PrintTimeTaken(proc.time() - ptm)
+      time = PrintTimeTaken(proc.time() - ptm)
+      cat(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, "\n", file=meta.env$log.file, append=TRUE, sep = "\t")
       return()
     }
 
@@ -329,7 +348,7 @@ func.env$runBetaRegression = function(){
   # when the cluster was shut down. Benchmarking 20 cores or lower has not been completed.
   nchunks     = ceiling(length(data.env$predictedMeth)/meta.env$chunk.size)
   chunk.names = c(1:nchunks)
-
+  cat("Regression running on", nchunks, "chunks\n", file=meta.env$log.file, append=TRUE)
   
   chunksSaved = function(){
     # This is a very basic test - it checks if the number of chunks present matches the expected
@@ -346,8 +365,8 @@ func.env$runBetaRegression = function(){
   }
 
   rm(predictedMeth.split)
-  # gc()
 
+  cat("Parallel script can now be invoked\n")
 
   # Process each chunk in turn
   invisible(lapply(chunk.names, func.env$betaRegressionOnChunk, F ))
@@ -408,15 +427,16 @@ func.env$runNullBetaRegression = function(){
 
   # Since there are 3 case and 3 control, we need to select 2 and 2.
   # TODO - make dynamic based on group column
+  # Choose number of samples to take (minimum multiple of two)
+
   predictedMethNull = data.env$predictedMeth[,c(1, 3, 2, 5)]
 
   colData(predictedMethNull)$group.null=rep(c(1,2), nrow(colData(predictedMethNull))/2)
 
   cat("Selected samples for modelling\n")
 
-  nchunks     = ceiling(length(data.env$predictedMethNull)/meta.env$chunk.size)
+  nchunks     = ceiling(length(predictedMethNull)/meta.env$chunk.size)
   chunk.names = c(1:nchunks)
-
   
   chunksSaved = function(){
     # This is a very basic test - it checks if the number of chunks present matches the expected
@@ -428,24 +448,17 @@ func.env$runNullBetaRegression = function(){
     cat("Reading existing", nchunks , "data chunks\n")
   } else {
     cat("Saving", nchunks , "data chunks to", meta.env$temp.image.path, "\n")
-    predictedMethNull.split = split(data.env$predictedMethNull, ceiling(seq_along(data.env$predictedMethNull)/meta.env$chunk.size), drop=TRUE)
+    predictedMethNull.split = split(predictedMethNull, ceiling(seq_along(predictedMethNull)/meta.env$chunk.size), drop=TRUE)
     invisible(mapply(saveChunks, predictedMethNull.split, chunk.names))
   }
 
-  # predictedMethNull.split = split(predictedMethNull, ceiling(seq_along(predictedMethNull)/meta.env$chunk.size), drop=TRUE)
-  # chunk.names = c(1:length(predictedMethNull.split))
-
-  # # Save out each chunk data
-  # cat("Saving", length(chunk.names) , "data chunks to", meta.env$temp.image.path, "\n")
-  # invisible(mapply(saveChunks, predictedMethNull.split, chunk.names))
-
   rm(predictedMethNull.split)
-  # gc()
+  cat("Parallel script can now be invoked\n")
 
   # Process each chunk in turn
   invisible(lapply(chunk.names, func.env$betaRegressionOnChunk, T ))
 
-    # At this point, you can invoke the parallelBetaRegression.r script on other node(s).
+  # At this point, you can invoke the parallelBetaRegression.r script on other node(s).
   # srun <options> /usr/bin/Rscript bin/parallelBetaRegression.r <temp.folder.name> <ncores> <is.null.regression>
   # Example:
   # srun -w calculon -c 36 /usr/bin/Rscript bin/parallelBetaRegression.r tmpImages_30core_25k_chunk/ 30 T
@@ -457,7 +470,7 @@ func.env$runNullBetaRegression = function(){
   }
   cat("Waiting for other nodes to complete\n")
   while (!locksRemoved()) {
-    Sys.sleep(1)
+    Sys.sleep(5)
   }
 
   cat("Loading results\n")
@@ -478,11 +491,9 @@ func.env$runNullBetaRegression = function(){
 }
 
 func.env$smoothValues = function(){
-  cat('Smoothing\n')
-  ## Break, and call new script with desired sill value, or continue with default sill of 1?
-  ## sill_value= readline("What is the value of sill to use (0 to 1)? please check graph ")
-  sill_value= 0.18
-
+  
+  sill_value= 0.20
+  cat("Smoothing with sill value",sill_value,"...\n")
   # It is necessary to smooth the variogram. Especially for greater h the variogram 
   # tends to oscillate strongly. This is the reason why the default bandwidth 
   # increases with increasing h. Nevertheless, the smoothed variogram may further 
@@ -519,6 +530,12 @@ func.env$smoothValues = function(){
   # clusters:
   clusters.rej     = testClusters(locCor, FDR.cluster=0.1)
 
+  cat('Trimming clusters\n')
+  # Error in IRanges with negative width. Remove row 50345
+  # idx <- GenomicRanges:::get_out_of_bound_index(ext_grn)
+  # if (length(idx) != 0L)
+  #     ext_grn <- ext_grn[-idx]
+
   # We then trim the rejected CpG clusters to remove the not differentially
   # methylated CpG sites at <q1>; what can be interpreted as the location-wise FDR:
   clusters.trimmed = trimClusters(clusters.rej, FDR.loc=0.05)
@@ -530,6 +547,7 @@ func.env$smoothValues = function(){
   # the methylation difference switches from positive to negative, or vice versa, if 
   # diff.dir = TRUE. That way we ensure that within a DMR all CpG sites are hypermethylated, 
   # and hypomethylated respectively.
+  cat('Finding DMRs\n')
   DMRs    = findDMRs(clusters.trimmed, max.dist=100, diff.dir=T)
   assign( "DMRs", DMRs, envir=data.env)
 
@@ -538,7 +556,7 @@ func.env$smoothValues = function(){
 }
 
 func.env$findOverlapsWithGTF = function(){
-  cat('Finding overlaps with GTF genes\n')
+  cat('Finding DMR overlaps with genes\n')
 
   merge_hits=function(x){
     data.frame(seqnames=x$seqnames[1], start=x$start[1], end=x$end[1], width=x$width[1],
@@ -550,30 +568,33 @@ func.env$findOverlapsWithGTF = function(){
   }
 
 
+
   GTF     = import.gff(meta.env$gtf.file, format="gtf",feature.type="gene")
-  bed.kit = import.bed(meta.env$target.region.file)
-
   tempoverlap1     = findOverlaps(data.env$DMRs, GTF)
-  tempoverlap1.kit = findOverlaps(data.env$DMRs, bed.kit)
   tempoverlap2     = data.env$DMRs[queryHits(tempoverlap1)]
-  tempoverlap2.kit = data.env$DMRs[queryHits((tempoverlap1.kit))]
-
+  
   tempoverlap2$annotation=paste(GTF[subjectHits(tempoverlap1)]$gene_id,
                                 GTF[subjectHits(tempoverlap1)]$type,
                                 GTF[subjectHits(tempoverlap1)]$gene_biotype,
                                 GTF[subjectHits(tempoverlap1)]$gene_name, sep='; ')
 
-  tempoverlap2.kit$annotation = bed.kit[subjectHits(tempoverlap1.kit)]$name
   tempoverlap2     = as.data.frame(tempoverlap2)
-  tempoverlap2.kit = data.frame(tempoverlap2.kit)
   tempoverlap2$seqnames2     = paste0(tempoverlap2$seqnames,'_', tempoverlap2$start)
-  tempoverlap2.kit$seqnames2 = paste0(tempoverlap2.kit$seqnames,'_', tempoverlap2.kit$start)
-
+  
   DMRs.annotated     = tempoverlap2 %>% group_by(seqnames2) %>% do(merge_hits(.)) %>% as.data.frame
-  DMRs.annotated.kit = tempoverlap2.kit %>% group_by(seqnames2) %>% do(merge_hits(.)) %>% as.data.frame
-
-  write.table(file=paste0(meta.env$temp.image.path, "DMRs_annotated_kit.tsv"),   sep="\t",row.names = F, DMRs.annotated.kit)
+ 
   write.table(file=paste0(meta.env$temp.image.path, "DMRs_annotated_genes.tsv"), sep="\t",row.names = F, DMRs.annotated)
+
+  if(!is.na(meta.env$target.region.file)){
+    bed.kit = import.bed(meta.env$target.region.file)
+    tempoverlap1.kit = findOverlaps(data.env$DMRs, bed.kit)
+    tempoverlap2.kit = data.env$DMRs[queryHits((tempoverlap1.kit))]
+    tempoverlap2.kit$annotation = bed.kit[subjectHits(tempoverlap1.kit)]$name
+    tempoverlap2.kit = data.frame(tempoverlap2.kit)
+    tempoverlap2.kit$seqnames2 = paste0(tempoverlap2.kit$seqnames,'_', tempoverlap2.kit$start)
+    DMRs.annotated.kit = tempoverlap2.kit %>% group_by(seqnames2) %>% do(merge_hits(.)) %>% as.data.frame
+    write.table(file=paste0(meta.env$temp.image.path, "DMRs_annotated_kit.tsv"),   sep="\t",row.names = F, DMRs.annotated.kit)
+  }
 
   cat("Plotting DMRs\n")
   outputDir = paste0(dirname(meta.env$sample.info.file),"/DMR_images/")

@@ -4,62 +4,131 @@ suppressMessages(library(ggplot2))
 suppressMessages(library(reshape))
 suppressMessages(require(grid))
 suppressMessages(library(xtable))
-source("functions.r")
 
-in_dir      =commandArgs(TRUE)[1]
-sample_names=commandArgs(TRUE)[2]
-readType    =commandArgs(TRUE)[3]
-outdir      =commandArgs(TRUE)[4]
-suffix      =commandArgs(TRUE)[5]
-plot_device =commandArgs(TRUE)[6]
+in_dir       = commandArgs(TRUE)[1]
+sample.file  = commandArgs(TRUE)[2]
+readType     = commandArgs(TRUE)[3]
+outdir       = commandArgs(TRUE)[4]
+suffix       = commandArgs(TRUE)[5]
+plot_device  = commandArgs(TRUE)[6]
 if (is.na(suffix)){
-  suffix=''
+  suffix=""
 }
 
-checkPath(in_dir, "Sample input folder")
-checkPath(sample_names, "Sample names file")
-checkPath(outdir, "Output directory")
+#' This function loads the external functions file.
+#' @title Load external functions
+#' @export
+loadFunctionsFile = function(){
+  cat("Loading functions ...\n")
+  file.arg.name = "--file="
+  script.name   = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
+  script.folder = dirname(script.name)
+  script.to.load = paste(sep="/", script.folder, "functions.r")
+  source(script.to.load)
+}
+
+loadFunctionsFile()
+
+pathExistsOrQuit(in_dir, "Sample input folder")
+pathExistsOrQuit(sample.file, "Sample names file")
+pathExistsOrQuit(outdir, "Output directory")
 
 
-files=list.files(path = in_dir, full.names = TRUE, recursive = TRUE)
-sample_names=read.table(sample_names)[,1]
+files        = list.files(path = in_dir, full.names = TRUE, recursive = TRUE)
+sample.names = read.table(sample.file)[,1]
 
 
 # Per sequence quality scores
 #----------------------------
-qual_scores=files[grep('per_sequence_quality_scores.txt',files)]
-mr1=matrix(ncol=3)
-colnames(mr1)=c('x','y','Sample')
-for (i in 1:length(sample_names)){
-  x=qual_scores[grep(sample_names[i],qual_scores)]
-  x=x[grep('_R1_',x)]
-  x=read.table(x, stringsAsFactors = FALSE)
-  colnames(x)=c('x','y')
-  x$Sample=sample_names[i]
-  mr1=rbind(mr1,x)
-}
-mr1=mr1[-1,]
-mr1=cbind(mr1,Read='Read 1')
+qual_scores = files[grep('per_sequence_quality_scores.txt',files)]
 
-if (readType=='pairedEnd') {
+
+#' Read the quality scores for a sample
+#' @title Read quality scores
+#' @param sample the sample name to read
+#' @return a table of scores
+#' @export
+getScores = function(sample){
+  x = qual_scores[grep(sample,qual_scores)]
+  x = x[grep('_R1_',x)]
+  x = read.table(x, stringsAsFactors = FALSE)
+  colnames(x) = c('x','y')
+  x$Sample = sample
+  # mr1 = rbind(mr1,x)
+
+}
+
+score.list = lapply(sample.names, getScores)
+mr1 = do.call("rbind", score.list)
+
+# mr1=matrix(ncol=3)
+# colnames(mr1)=c('x','y','Sample')
+# for (i in 1:length(sample.names)){
+#   x=qual_scores[grep(sample.names[i],qual_scores)]
+#   x=x[grep('_R1_',x)]
+#   x=read.table(x, stringsAsFactors = FALSE)
+#   colnames(x)=c('x','y')
+#   x$Sample=sample.names[i]
+#   mr1=rbind(mr1,x)
+# }
+
+#' Create a quality score plot for paired end reads
+#' @title Create a paired end read quality plot
+#' @return a \code{\link{ggplot}} object
+#' @export
+makePairedEndPlot = function(){
   mr2=matrix(ncol=3)
   colnames(mr2)=c('x','y','Sample')
-  for (i in 1:length(sample_names)){
-    y=qual_scores[grep(sample_names[i],qual_scores)]
-    y=y[grep('_R2_',y)]
-    y=read.table(y, stringsAsFactors = FALSE)
+  
+  for (i in 1:length(sample.names)){
+    y= qual_scores[grep(sample.names[i],qual_scores)]
+    y= y[grep('_R2_',y)]
+    y= read.table(y, stringsAsFactors = FALSE)
     colnames(y)=c('x','y')
-    y$Sample=sample_names[i]
+    y$Sample=sample.names[i]
     mr2=rbind(mr2,y)
   }
   mr2=mr2[-1,]
   mr2=cbind(mr2,Read='Read 2')
   
-  d=rbind(mr1,mr2)
-  p=ggplot(d, aes(x = x, y = y, group=Sample, colour=Sample, shape=Sample)) + geom_line(size=0.3) + geom_point(size=1) + facet_wrap(~Read) +
+  d=rbind(mr1,mr2) 
+  ggplot(d, aes(x = x, y = y, group=Sample, colour=Sample, shape=Sample)) + 
+    geom_line(size=0.3) + 
+    geom_point(size=1) + 
+    facet_wrap(~Read) +
     theme( axis.title.x =element_text(size=9), axis.title.y =element_text(size=6), 
            axis.text.x=element_text(size=8), axis.text.y=element_text(size=7), legend.text=element_text(size=8),  
-           legend.key.height=unit(.8,"line"), axis.title.y=element_blank()) + ylab("") + xlab('Mean Quality score') + scale_shape_manual(values=1:length(unique(d$Sample))) 
+           legend.key.height=unit(.8,"line"), axis.title.y=element_blank()) + 
+    ylab("") + 
+    xlab('Mean Quality score') + 
+    scale_shape_manual(values=1:length(unique(d$Sample))) 
+}
+
+
+
+mr1=mr1[-1,]
+mr1=cbind(mr1,Read='Read 1')
+
+if (readType=='pairedEnd') {
+  p = makePairedEndPlot()
+  # mr2=matrix(ncol=3)
+  # colnames(mr2)=c('x','y','Sample')
+  # for (i in 1:length(sample.names)){
+  #   y=qual_scores[grep(sample.names[i],qual_scores)]
+  #   y=y[grep('_R2_',y)]
+  #   y=read.table(y, stringsAsFactors = FALSE)
+  #   colnames(y)=c('x','y')
+  #   y$Sample=sample.names[i]
+  #   mr2=rbind(mr2,y)
+  # }
+  # mr2=mr2[-1,]
+  # mr2=cbind(mr2,Read='Read 2')
+  
+  # d=rbind(mr1,mr2)
+  # p=ggplot(d, aes(x = x, y = y, group=Sample, colour=Sample, shape=Sample)) + geom_line(size=0.3) + geom_point(size=1) + facet_wrap(~Read) +
+  #   theme( axis.title.x =element_text(size=9), axis.title.y =element_text(size=6), 
+  #          axis.text.x=element_text(size=8), axis.text.y=element_text(size=7), legend.text=element_text(size=8),  
+  #          legend.key.height=unit(.8,"line"), axis.title.y=element_blank()) + ylab("") + xlab('Mean Quality score') + scale_shape_manual(values=1:length(unique(d$Sample))) 
 } else {
   d=mr1
   p=ggplot(d, aes(x = x, y = y, group=Sample, colour=Sample, shape=Sample)) + geom_line(size=0.3) + geom_point(size=1) + facet_wrap(~Read) +
@@ -76,12 +145,12 @@ ggsave(filename=paste0(outdir,'/per_sequence_quality_scores', suffix, '.', plot_
 gc=files[grep('per_sequence_gc_content.txt',files)]
 mr1=matrix(ncol=3)
 colnames(mr1)=c('x','y','Sample')
-for (i in 1:length(sample_names)){
-  x=gc[grep(sample_names[i],gc)]
+for (i in 1:length(sample.names)){
+  x=gc[grep(sample.names[i],gc)]
   x=x[grep('_R1_',x)]
   x=read.table(x, stringsAsFactors = FALSE)
   colnames(x)=c('x','y')
-  x$Sample=sample_names[i]
+  x$Sample=sample.names[i]
   mr1=rbind(mr1,x)
 }
 mr1=cbind(mr1,Read='Read 1')
@@ -91,12 +160,12 @@ mr1=mr1[-1,]
 if (readType=='pairedEnd') {
   mr2=matrix(ncol=3)
   colnames(mr2)=c('x','y','Sample')
-  for (i in 1:length(sample_names)){
-    y=gc[grep(sample_names[i],gc)]
+  for (i in 1:length(sample.names)){
+    y=gc[grep(sample.names[i],gc)]
     y=y[grep('_R2_',y)]
     y=read.table(y, stringsAsFactors = FALSE)
     colnames(y)=c('x','y')
-    y$Sample=sample_names[i]
+    y$Sample=sample.names[i]
     mr2=rbind(mr2,y)
   }
   mr2=cbind(mr2,Read='Read 2')
@@ -119,28 +188,28 @@ ggsave(filename=paste0(outdir,'/per_sequence_gc_content', suffix, '.', plot_devi
 length_dist=files[grep('seq_length.txt',files)]
 mr1=matrix(ncol=4)
 colnames(mr1)=c('Position','Frequency','Sample', 'Read')
-for (i in 1:length(sample_names)){
-  x=length_dist[grep(sample_names[i],length_dist)]
+for (i in 1:length(sample.names)){
+  x=length_dist[grep(sample.names[i],length_dist)]
   x=x[grep('_R1_',x)]
   x=read.table(x, stringsAsFactors = FALSE)
   colnames(x)=c('Position','Frequency')
   x$Position <- factor(x$Position, as.character(x$Position))
   x$Read='Read 1'
-  x$Sample=sample_names[i]
+  x$Sample=sample.names[i]
   mr1=rbind(mr1,x)
 }
 mr1=mr1[-1,]
 if (readType=='pairedEnd') {
   mr2=matrix(ncol=4)
   colnames(mr2)=c('Position','Frequency','Sample', 'Read')
-  for (i in 1:length(sample_names)){
-    y=length_dist[grep(sample_names[i],length_dist)]
+  for (i in 1:length(sample.names)){
+    y=length_dist[grep(sample.names[i],length_dist)]
     y=y[grep('_R2_',y)]
     y=read.table(y, stringsAsFactors = FALSE)
     colnames(y)=c('Position','Frequency')
     y$Position <- factor(y$Position, as.character(y$Position))
     y$Read='Read 2'
-    y$Sample=sample_names[i]
+    y$Sample=sample.names[i]
     mr2=rbind(mr2,y)
   }
   mr2=mr2[-1,]
@@ -163,30 +232,30 @@ ggsave(filename=paste0(outdir,'/sequence_length_distribution', suffix, '.', plot
 dup_levels=files[grep('seq_dup_levels.txt',files)]
 mr1=matrix(ncol=4)
 colnames(mr1)=c('Duplication_Level','Percentage', 'Sample','Read')
-for (i in 1:length(sample_names)){
-  x=dup_levels[grep(sample_names[i],dup_levels)]
+for (i in 1:length(sample.names)){
+  x=dup_levels[grep(sample.names[i],dup_levels)]
   x=x[grep('_R1_',x)]
   x=read.table(x, stringsAsFactors = FALSE)
   colnames(x)=c('Duplication_Level','Percentage of Deduplicated','Percentage')
   x$Duplication_Level <- factor(x$Duplication_Level, as.character(x$Duplication_Level))
   x=x[,-which(colnames(x)=="Percentage of Deduplicated")]
   x$Read='Read 1'
-  x$Sample=sample_names[i]
+  x$Sample=sample.names[i]
   mr1=rbind(mr1,x)
 }
 mr1=mr1[-1,]
 if (readType=='pairedEnd') {
   mr2=matrix(ncol=4)
   colnames(mr2)=c('Duplication_Level','Percentage', 'Sample','Read')
-  for (i in 1:length(sample_names)){
-    y=dup_levels[grep(sample_names[i],dup_levels)]
+  for (i in 1:length(sample.names)){
+    y=dup_levels[grep(sample.names[i],dup_levels)]
     y=y[grep('_R2_',y)]
     y=read.table(y, stringsAsFactors = FALSE)
     colnames(y)=c('Duplication_Level','Percentage of Deduplicated','Percentage')
     y$Duplication_Level <- factor(y$Duplication_Level, as.character(y$Duplication_Level))
     y=y[,-which(colnames(y)=="Percentage of Deduplicated")]
     y$Read='Read 2'
-    y$Sample=sample_names[i]
+    y$Sample=sample.names[i]
     mr2=rbind(mr2,y)
   }
   mr2=mr2[-1,]
@@ -211,8 +280,8 @@ ggsave(filename=paste0(outdir,'/sequence_dup_levels', suffix, '.', plot_device),
 base_content=files[grep('per_base_sequence_content.txt',files)]
 mr1=matrix(ncol=5)
 colnames(mr1)=c('Base', 'Percentage', 'Nucleotide','Sample','Read')
-for (i in 1:length(sample_names)){
-  x=base_content[grep(sample_names[i],base_content)]
+for (i in 1:length(sample.names)){
+  x=base_content[grep(sample.names[i],base_content)]
   x=x[grep('_R1_',x)]
   x=read.table(x, stringsAsFactors = FALSE)
   colnames(x)=c('Base','G','A', 'T', 'C')
@@ -225,7 +294,7 @@ for (i in 1:length(sample_names)){
   all=as.data.frame(all[-1,])
   all$Percentage=as.numeric(as.character(all$Percentage))
   all$Read='Read 1'
-  all$Sample=sample_names[i]
+  all$Sample=sample.names[i]
   mr1=rbind(mr1,all)
 }
 mr1=mr1[-1,]
@@ -239,8 +308,8 @@ ggsave(filename=paste0(outdir,'/per_base_sequence_content_r1', suffix, '.', plot
 if (readType=='pairedEnd') {
     mr2=matrix(ncol=5)
     colnames(mr2)=c('Base', 'Percentage', 'Nucleotide','Sample','Read')
-    for (i in 1:length(sample_names)){
-      x=base_content[grep(sample_names[i],base_content)]
+    for (i in 1:length(sample.names)){
+      x=base_content[grep(sample.names[i],base_content)]
       x=x[grep('_R2_',x)]
       x=read.table(x, stringsAsFactors = FALSE)
       colnames(x)=c('Base','G','A', 'T', 'C')
@@ -253,7 +322,7 @@ if (readType=='pairedEnd') {
       all=as.data.frame(all[-1,])
       all$Percentage=as.numeric(as.character(all$Percentage))
       all$Read='Read 2'
-      all$Sample=sample_names[i]
+      all$Sample=sample.names[i]
       mr2=rbind(mr2,all)
     }
 mr2=mr2[-1,]

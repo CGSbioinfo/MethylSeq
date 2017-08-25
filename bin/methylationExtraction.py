@@ -68,10 +68,13 @@ def methylationExtraction(i, ai, remove_bases_dict):
         ignoreString = ""
 
 
-    cx_string = "--CX_context" if args.cx else ""
+    cx_string = "--cytosine_report --CX_context --genome_folder "+ai['reference_genome']+" " if args.cx else ""
 
-    cmdStr = ('srun -c %i bismark_methylation_extractor %s --output %s %s %s %s &>%s'
-            % (ncores, params, out_dir, ignoreString, cx_string, bamFile, logFile ))
+    param_string = ('--multicore %i %s %s --output %s %s' %
+        ( ncores, params, cx_string, out_dir, ignoreString ))
+
+    cmdStr = ('srun -c %i --mem=20G bismark_methylation_extractor %s %s &>%s'
+            % (ncores, param_string, bamFile, logFile ))
     print("\nExtracting methylation from "+i)
     functions.runAndCheck(cmdStr, "Error extracting methylation")
 
@@ -102,7 +105,7 @@ def makeMbiasPlots():
     out_file = "Report/figure/methExtractQC/Mbias_plot%s.pdf" % clipped
 
     cmdStr = ('srun /usr/bin/Rscript bin/methylExtractQC_mbias_plot.R %s %s .M-bias.txt %s'
-            % (out_dir, sample_names_file, out_file))
+            % (out_dir, args.sample_names_file, out_file))
     print("Making M-bias plots")
     functions.runAndCheck(cmdStr, "Error generating M-bias plots")
        

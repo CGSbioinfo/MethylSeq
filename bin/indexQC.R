@@ -1,10 +1,24 @@
 #!/usr/local/bin/Rscript
 suppressMessages(library(ggplot2))
 suppressMessages(library(reshape))
-source("functions.r")
 
 indir  = commandArgs(TRUE)[1]
 outdir = commandArgs(TRUE)[2]
+
+#' This function loads the external functions file.
+#' @title Load external functions
+#' @export
+loadFunctionsFile = function(){
+  cat("Loading functions ...\n")
+  file.arg.name = "--file="
+  script.name   = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
+  script.folder = dirname(script.name)
+  script.to.load = paste(sep="/", script.folder, "functions.r")
+  source(script.to.load)
+}
+
+loadFunctionsFile()
+
 dir.create(outdir, recursive=TRUE, showWarnings=FALSE)
 files=list.files(indir, recursive=TRUE, pattern='fastqc_data.txt$')
 

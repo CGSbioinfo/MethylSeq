@@ -1,28 +1,36 @@
 # Common functions for the methylation sequencing 
 # pipline.
 
-checkPath = function(path, msg){
-    # Check if the given path exists.
-    # If it does not, print the given
-    # message and quit with exit code 1
-    #
-    # path - the file path to check
-    # msg  - the error message to print
+#' This function checks if a file path exists.
+#' If the path does not exist, prints the given
+#' message and quits with exit code 1
+#' @title Check if the given path exists and quit if missing
+#' @param path the file path to check
+#' @param msg the error message to print if path is missing
+#' @examples
+#' dir = "/path/to/folder/"
+#' pathExistsOrQuit(dir)
+#' setwd(dir)
+#' @export
+pathExistsOrQuit = function(path, msg){
     if(!file.exists(path)){
         cat(msg, "'", path, "' not found\n" )
         quit(save="no", status=1)
     }
 }
 
-PrintTimeTaken = function(proc.time.object){
-    # Format the given relative proc.time() object.
-    #
-    # proc.time.object - a result of proc.time()
-    #
-    # Example usage: 
-    # ptm = proc.time()
-    # DoAFunction()
-    # PrintTimeTaken(proc.time() - ptm)
+#' Formats the given relative \code{\link{proc.time()}} result, 
+#' prints the time to screen, and returns the time in tab format.
+#' @title Format a proc.time result
+#' @param proc.time.object - a result of \code{\link{proc.time()}}
+#' @return a tab separated string of days to seconds
+#' @examples
+#'
+#' ptm = proc.time()
+#' DoAFunction()
+#' printTimeTaken(proc.time() - ptm)
+#' @export
+printTimeTaken = function(proc.time.object){
     days  = floor(proc.time.object / 86400)
     proc.time.object   = proc.time.object - (days*86400)
     hours = floor(proc.time.object / 3600)
@@ -30,29 +38,42 @@ PrintTimeTaken = function(proc.time.object){
     mins  = floor(proc.time.object / 60)
     secs  = proc.time.object - (mins*60)
     cat("Completed in", days[3], "days", hours[3], "hours", mins[3],"minutes and", secs[3], "seconds\n" )
+    paste(days[3], hours[3], mins[3], secs[3], sep="\t")
 }
 
-RunAndTime = function(f){
-    # Run the given function and print
-    # the time it took to complete. Returns
-    # the return value of f.
-    #
-    # f - the function to run
+#' Run the given function and print
+#' the time it took to complete.
+#' @title Run and time the given function
+#'
+#' @param f the function to run
+#' @return the return value of f.
+#' @examples
+#' f = function(){
+#'  sleep(10)
+#' }
+#' runAndTime(f)
+#' @export
+runAndTime = function(f){
     if(!is.function(f)){
         cat("A function was not supplied")
         return()
     }
     ptm = proc.time()
     r = f()
-    PrintTimeTaken(proc.time() - ptm)
+    printTimeTaken(proc.time() - ptm)
     r
 }
 
-PrintEnvironmentSize = function(){
-    # Print the size of the objects in the global
-    # environmnent
-    cat("Global environment:\n")
-    for ( o in ls(envir=globalenv()) ) {
-      cat("\t", o, ": ", object.size(get(o)), "\n")
+
+#' Print the size of the objects in the given environmnent
+#' @param env the environment
+#' @examples
+#'  
+#' printEnvironmentSize(globalenv())
+#' @export
+printEnvironmentSize = function(env){
+    cat("Environment:\n")
+    for ( o in ls(envir=env) ) {
+      cat("\t", o, ": ", object.size(get(o, envir=env)), "\n")
     }
 }

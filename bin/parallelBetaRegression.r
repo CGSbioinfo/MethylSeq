@@ -15,21 +15,24 @@ meta.env$temp.image.folder  = commandArgs(TRUE)[1]
 meta.env$ncores             = as.numeric(commandArgs(TRUE)[2])
 meta.env$isnull             = commandArgs(TRUE)[3]
 
-##################
-#
-# Load external 
-# functions
-#
-##################
+#' This function loads the external functions file.
+#' @title Load external functions
+#' @export
+loadFunctionsFile = function(){
+  cat("Loading functions ...\n")
+  file.arg.name = "--file="
+  script.name   = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
+  script.folder = dirname(script.name)
+  script.to.load = paste(sep="/", script.folder, "functions.r")
+  source(script.to.load)
+}
 
-cat("Loading functions ...\n")
+loadFunctionsFile()
 
-file.arg.name   = "--file="
-script.name     = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
-script.basename = dirname(script.name)
-other.name      = paste(sep="/", script.basename, "functions.r")
+meta.env$server = system("hostname", intern = TRUE)
 
-source(other.name)
+meta.env$log.file = paste0(meta.env$temp.image.folder, "log.txt")
+cat("Running parallel on", meta.env$server, "\n", file=meta.env$log.file, append=TRUE)
 
 ##################
 #
@@ -53,7 +56,9 @@ betaRegressionOnChromosome = function(chunk.name){
                       mc.cores=meta.env$ncores)
 
       saveRDS(result, file = resultsFile)
-      PrintTimeTaken(proc.time() - ptm)
+      time = printTimeTaken(proc.time() - ptm)
+      cat(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, "\n", 
+        file=meta.env$log.file, append=TRUE, sep = "\t")
       return()
     }
 
@@ -91,7 +96,8 @@ betaNullRegressionOnChromosome = function(chunk.name){
                       mc.cores=meta.env$ncores)
 
       saveRDS(result, file = resultsFile)
-      PrintTimeTaken(proc.time() - ptm)
+      time = PrintTimeTaken(proc.time() - ptm)
+      cat(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, "\n", file=meta.env$log.file, append=TRUE, sep = "\t")
       return()
     }
 

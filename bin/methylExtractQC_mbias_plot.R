@@ -10,21 +10,19 @@ sample_names=commandArgs(TRUE)[2]
 pattern     =commandArgs(TRUE)[3]
 outfile     =commandArgs(TRUE)[4]
 
-##################
-#
-# Load external 
-# functions
-#
-##################
+#' This function loads the external functions file.
+#' @title Load external functions
+#' @export
+loadFunctionsFile = function(){
+  cat("Loading functions ...\n")
+  file.arg.name = "--file="
+  script.name   = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
+  script.folder = dirname(script.name)
+  script.to.load = paste(sep="/", script.folder, "functions.r")
+  source(script.to.load)
+}
 
-cat("Loading functions ...\n")
-
-file.arg.name   = "--file="
-script.name     = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
-script.basename = dirname(script.name)
-other.name      = paste(sep="/", script.basename, "functions.r")
-
-source(other.name)
+loadFunctionsFile()
 
 ##################
 #
@@ -33,8 +31,8 @@ source(other.name)
 #
 ##################
 
-checkPath(sample_names, "Sample name file") 
-checkPath(in_dir, "Input folder")
+pathExistsOrQuit(sample_names, "Sample name file") 
+pathExistsOrQuit(in_dir, "Input folder")
 
 
 ##################
