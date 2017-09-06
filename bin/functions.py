@@ -1,5 +1,8 @@
-#!/usr/bin/env python
+''' Generic methods for methylSeq analysis.
 
+    This module contains general methods used in sequence
+    analysis pipelines
+'''
 import os
 import sys
 import re
@@ -81,19 +84,7 @@ def read_sample_names(sample_names_file):
         sampleNames.append(line.strip())
     return(sampleNames)
 
-def check_gz(dir):
-    """ Determines if fastq files are gzipped and returns a gz variable which will be added as a suffix when fastq file names are called in further steps"""
-    readFiles = []
-    for root, dir, files in os.walk(dir):
-        readFiles.extend(files)
-    indicesgzFiles = [i for i, x in enumerate(readFiles) if re.findall(".fastq.gz", x)]
-    if indicesgzFiles:
-        gz =".gz"
-    else:
-        gz =""
-    return(gz)
-
-def check_gz(dir, suffix):
+def check_gz(dir, suffix="fastq"):
     """ Determines if files with the given extension are gzipped and returns a gz string which 
     will be added as a suffix when file names are called in further steps
     """
@@ -128,6 +119,11 @@ def get_strand(strand):
             strand_picard = 'SECOND_READ_TRANSCRIPTION_STRAND'
     return([strand_picard, strand_htseq])
 
+def slash_terminate(s):
+    '''Add a trailing '/' to the string if not present
+    '''
+    return(s if s.endsWith('/') else s + '/')
+
 def runAndCheck(cmd, msg):
     '''Run the given command and check the return value.
 
@@ -138,15 +134,33 @@ def runAndCheck(cmd, msg):
         --cmd - the command to be run
         --msg - the message to print if the command returns an error
     '''
-    print "Invoking: %s" % cmd
+    logger = logging.getLogger("runMethylationAnalysis.functions")
+    logger.debug("Invoking: " + cmd)
     try:
-        retcode = subprocess.call(cmd, shell=True)
+        retcode = subprocess.call(cmd, shell=True, stderr=subprocess.STDOUT)
         if retcode != 0:
-            print msg+". Quitting."
+            logger.debug("System call returned "+str(retcode))
+            logger.error(msg+". Quitting.")
             sys.exit(1)
     except OSError as e:
+        logger.exception("Error invoking command")
         print >>sys.stderr, "Execution exception:", e
         sys.exit(1)
+
+def srun(cmd, ncores="1", mem=""):
+    '''Run the given command through srun with the given number of
+    cores and memory in Gb. If srun is not installed, invokes the 
+    command directly.
+    '''
+    logger = logging.getLogger("runMethylationAnalysis.functions")
+    if(srun_is_installed()):
+        s = "srun -c "+str(ncores)+" "
+        s = s + " --mem="+str(mem)+"G " if mem else s
+        cmd = s+cmd
+    else:
+        logger.debug("srun not found")
+
+    runAndCheck(cmd, "Error in command") 
 
 def getWorkingDir(analysis_info_file):
     '''Get the working directory specified in the analysis info file
@@ -154,15 +168,32 @@ def getWorkingDir(analysis_info_file):
     ai=read_analysis_info_file(analysis_info_file)
     return(ai['working_directory'])
 
-def runParallel(function, ai):
-    '''Run the given function in parallel instances
-    for all the sample names
-
-    --function - the function to be run in parallel
-    --ai       - the analysis options
+def getNCores(analysis_info_file):
+    '''Get the number of cores specified in the analysis info file
     '''
-    ncores      = int(ai['ncores'])
-    ninstances  = int(ai['ninstances'])
-    sampleNames = functions.read_sample_names(args.sample_names_file)
-    print ("Setting to run in batches of %i instances with %i cores per instance" % (ninstances, ncores))
-    Parallel(n_jobs=ninstances)(delayed(function)(i, ai) for i in sampleNames)
+    ai=read_analysis_info_file(analysis_info_file)
+    return(int(ai['ncores']))
+
+def testLogging():
+    '''Testing for the logger
+    ''' 
+    logger = logging.getLogger("runMethylationAnalysis.functions")
+    logger.info("Testing logging info level")
+    logger.debug("Testing logging debug level")
+    logger.error("Testing logging error level")
+    try:
+        logger.info("Testing stack trace")
+        raise RuntimeError
+    except Exception, err:
+        logger.exception("Expected exception")
+
+def srun_is_installed():
+    '''Tests if srun is installed. 
+
+        Uses 'command -v' for POSIX compliance; works in sh and bash.
+        When srun is not found, the result will be 1, else null.
+    '''
+    cmd = 'command -v srun >/dev/null 2>&1 || { echo "1" >&2; }'
+    p = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True)
+    output = p.stdout.read()
+    return(output != "1\n")

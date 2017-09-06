@@ -77,3 +77,27 @@ printEnvironmentSize = function(env){
       cat("\t", o, ": ", object.size(get(o, envir=env)), "\n")
     }
 }
+
+#' Log a message to file with the current time
+#' @param file the target file
+#' @param msg the message
+#' @export
+logToFile = function(file, msg){
+    cat(paste(Sys.time(), msg, sep="\t"), file=file, append=TRUE)
+}
+
+#' Log a message to file with log level INFO
+#' @param file the target file
+#' @param msg the message
+#' @export
+info = function(file, msg){
+    logToFile(file, paste("INFO", msg, sep="\t"))
+}
+
+#' Log a message to file with log level WARN
+#' @param file the target file
+#' @param msg the message
+#' @export
+warn = function(file, msg){
+    logToFile(file, paste("WARN", msg, sep="\t"))
+}

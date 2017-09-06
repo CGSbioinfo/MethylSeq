@@ -13,37 +13,37 @@ import multiprocessing
 import subprocess
 import functions
 import argparse
+import validation
+import invokations
+import plotting
+import mapping
 
 __version__ = 'v02'
-# created on 30/08/2016
 
-def step_1(analysis_info_file):
+def step_1():
     '''Run the first part of the analysis pipeline.
 
     Checks the info files, runs bcl2fastq, and creates the sample names file
     for future scripts.
-
-    --analysis_info_file - the file of analysis options
     '''
 
-    cmd_str = "python bin/validateAnalysisInfo.py --analysis_info_file %s" % analysis_info_file
-    functions.runAndCheck(cmd_str, "Error in analysis info")
+    if not validation.validateAnalysisInfo(args.analysis_info_file):
+        logger.error("Analysis info file failed validation")
+        sys.exit(1)
 
-    cmd_str = "python bin/validateSampleSheet.py --analysis_info_file %s" % analysis_info_file
-    functions.runAndCheck(cmd_str, "Error in in sample sheet")
+    if not validation.validateSampleSheet(args.analysis_info_file):
+        logger.error("Sample sheet failed validation")
+        sys.exit(1)
 
-    cmd_str = "python bin/run_bcl2fastq.py --analysis_info_file %s" % analysis_info_file
-    functions.runAndCheck(cmd_str, "Error in bcl2fastq")
+    invokations.invoke_bcl2fastq(args.analysis_info_file)
 
-    print "Finished bcl2fastq. Output is in the fastq/ folder"
+    logger.info("Finished bcl2fastq. Output is in the fastq/ folder")
 
-    functions.runAndCheck("python bin/create_sampleNames.py ", "Error creating samples names")
+    invokations.create_sample_names(args.analysis_info_file)
 
-    print "Created sample_names_file"
+    invokations.organize_working_directory()
 
-    functions.runAndCheck("python bin/organizeWorkingDirectory.py ", "Error organizing working directory")
-
-    print "Finished running step 1"
+    logger.info("Finished running step 1")
 
 def step_2():
     '''Run the second part of the analysis pipeline.
@@ -51,60 +51,103 @@ def step_2():
     Runs fastqc, trims reads, and generates the QC plots for 
     raw and trimmed data.
     '''
-    print "Running fastqc"
-    functions.runAndCheck("python bin/qcReads.py ", "Error in fastqc")
-    print "Finished fastqc"
+    logger.info("Running fastqc")
+    invokations.qcReads()
 
-    print "Creating plots and tables raw data"
-    functions.runAndCheck("python bin/fastqc_tables_and_plots.py --suffix_name _raw --out_dir_report Report/figure/rawQC --plot_device pdf", "Error making plots")
-    print "Finished plots and tables raw data"
+    logger.info("Creating plots and tables for raw data")
+    plotting.fastqc_tables_and_plots(suffix_name='_raw', out_dir_report='Report/figure/rawQC', plot_device='pdf')
 
-    print "Running trimgalore"
-    functions.runAndCheck("python bin/trimmingReads.py --in_dir rawReads/ --out_dir trimmedReads/", "Error in trimgalore")
-    print "Finished trimgalore"
+    logger.info("Trimming reads")
+    invokations.trim_reads()
 
-    print "Creating plots and tables for trimmed data"
-    functions.runAndCheck("python bin/fastqc_tables_and_plots.py --in_dir trimmedReads/ --out_dir trimmedReads/ --suffix_name _trimmed --out_dir_report Report/figure/trimmedQC --plot_device pdf", "Error making plots")
-    print "Finished plots and tables trimmed data"
-    print "Finished running step 2"
+    logger.info("Creating plots and tables for trimmed data")
+    plotting.fastqc_tables_and_plots(in_dir='trimmedReads/', out_dir='trimmedReads/', suffix_name='_trimmed', out_dir_report='Report/figure/trimmedQC', plot_device='pdf')
 
-def step_3(analysis_info_file):
+    logger.info("Finished running step 2")
+
+def step_3():
     '''Run the third part of the analysis pipeline.
 
     Maps and deduplicates reads with bismark, and creates mapping 
     QC plots.
-
-    --analysis_info_file - the file of analysis options
     '''
-    functions.runAndCheck("python bin/validateAnalysisInfo.py --analysis_info_file "+analysis_info_file, "Error in analysis info")
+    if not validation.validateAnalysisInfo(args.analysis_info_file):
+        logger.error("Analysis info file failed validation")
+        sys.exit(1)
 
-    functions.runAndCheck("python bin/mappingReads.py --run bismark_alignment " + "--analysis_info_file " + analysis_info_file + " --sample_names_file " + args.sample_names_file, "Error mapping reads")
+    logger.info("Running alignment")
+    mapping.map_reads(run='bismark_alignment')
 
-    print "Finished mapping"
+    logger.info("Running deduplication")
+    mapping.map_reads(run='deduplicate_bismark')
 
-    print "Running deduplication"
-    functions.runAndCheck("python bin/mappingReads.py --run deduplicate_bismark " + "--analysis_info_file " + analysis_info_file + " --sample_names_file " + args.sample_names_file, "Error deduplicating")
-    print "Finished deduplication"
+    logger.info("Making plots")
 
-    print "Making plots"
-
-    ai=functions.read_analysis_info_file(analysis_info_file)
-
-    path        = ai['working_directory']
+    path        = functions.getWorkingDir(args.analysis_info_file)
     read_dir    = path + "alignedReads/"
     sample_file = path + "sample_names.txt"
     out_dir     = path + "Report/figure/mappingQC/"
     functions.make_sure_path_exists(out_dir)
 
-    cmd_str = ('srun /usr/bin/Rscript bin/mappingQC.R %s %s  _bismark_bt2_PE_report.txt %s' 
-        % (read_dir, path+"sample_names.txt", out_dir))
+    cmd_str = ('/usr/bin/Rscript bin/mappingQC.R %s %s  _bismark_bt2_PE_report.txt %s' 
+        % (read_dir, sample_file, out_dir))
 
-    functions.runAndCheck(cmd_str, "Error making mapping QC plots")
-    print "Finished running step 3"
+    functions.srun(cmd_str)
+    logger.info("Finished running step 3")
 
+def step_4():
+    '''Extract methylation data from the mapped reads
+    '''
+    logger.info("Extracting methlyation data")
+    invokations.extract_methylation(args.analysis_info_file)
+    invokations.create_remove_bases_file_info("remove_bases.txt")
+    logger.info("Finished running step 4")
+
+
+def setupLogger():
+    '''Configure the logger. 
+
+    Use a log file in the analysis working directory to store
+    all messages of level DEBUG or higher. Send all messages of
+    level INFO or higher to sdout.
+    '''
+    logger = logging.getLogger("runMethylationAnalysis")
+    logger.setLevel(logging.DEBUG)
+
+    fh = logging.FileHandler(functions.getWorkingDir(args.analysis_info_file)+"analysis.log")
+ 
+    formatter = logging.Formatter('%(asctime)s\t%(name)s\t%(funcName)s\t%(levelname)s\t%(message)s')
+    fh.setFormatter(formatter)
+    fh.setLevel(logging.DEBUG)
+    logger.addHandler(fh)
+
+    sh = logging.StreamHandler()
+    sh.setLevel(logging.INFO)
+    logger.addHandler(sh)
+    return(logger)
+
+def runTests():
+    ''' Run tests
+    '''
+    logger.info("Testing function")
+    functions.testLogging() 
+
+def noArgs():
+    ''' Run when no --run argument was input
+    '''
+    print "No run argument was supplied!"
+    print "Use --help to see valid parameters."
+    sys.exit(1)  
+
+
+def makeInfoFile():
+    invokations.create_analysis_info_file(args.analysis_info_file)
+
+def makeRemoveFile():
+    invokations.create_remove_bases_file_info("remove_bases.txt")
 
 if __name__ == '__main__':
-    # Script information
+    
     parser = argparse.ArgumentParser(prog='runMethylationAnalysis.py',description = '')
     parser.add_argument('-v', '--version', action='version', version='%(prog)s-'+__version__)
 
@@ -113,31 +156,29 @@ if __name__ == '__main__':
         help='Text file with details of the analysis. Default=analysis_info.txt', 
         default='analysis_info.txt')
 
-    # # Note - this argument is never used at the moment.
-    # parser.add_argument('--sample_names_file', 
-    #     help='File with sample names. Default=sample_names.txt', 
-    #     default='sample_names.txt')
-
     # Choose a section of the pipeline to run
     parser.add_argument('--run', 
-        help='Choose a section of the pipeline to run. Possible options: step1_prepare_analysis, step2_qc_and_trimming, step3_mapping_and_deduplication', 
+        help='Choose a section of the pipeline to run. Possible options: create_info, create_remove_file, step1_prepare_analysis, step2_qc_and_trimming, step3_mapping_and_deduplication, step4_extract_methylation', 
         default='')
 
     # Parse arguments
     args=parser.parse_args()
+    logger = setupLogger()
 
-    if args.run == '':
-        print "No run argument was supplied!"
-        print "Use --help to see valid parameters."
-        sys.exit(1)
+    # Run the command input
+    argDict = { 'create_info': makeInfoFile,
+                'step1_prepare_analysis': step_1,
+                'step2_qc_and_trimming': step_2,
+                'step3_mapping_and_deduplication': step_3,
+                'step4_extract_methylation': step_4,
+                'step5_extract_methylation': step_4, # deliberately same as 4, see readme
+                'test': runTests,
+                '': noArgs,
+                'create_remove_file': makeRemoveFile }
 
-    if args.run == 'step1_prepare_analysis':
-        step_1(args.analysis_info_file)
+    for i in argDict:
+        if(args.run==i):
+            logger.info("Running command '"+i+"'")
+            argDict[i]()
 
-    if args.run == 'step2_qc_and_trimming':
-        step_2()
-
-    if args.run == 'step3_mapping_and_deduplication':
-        step_3(args.analysis_info_file)
-        
     sys.exit(0)

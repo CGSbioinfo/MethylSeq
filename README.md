@@ -70,7 +70,7 @@ At this point you should have a directory where you will do the analysis and a b
 ```bash  
 $ python bin/analysis_info.py
 ```
-A file named 'analysis_info.txt' will be created in the folder. Open it in a text editor or vi and fill it. For example: 
+A file named ```analysis_info.txt``` will be created in the folder. Open it in a text editor or vi and fill it. For example: 
 >Working directory = /mnt/cgs-fs2/Bioinfo_pipeline/MethylSeq/test/aug2016/heroG/   
 >run_folder = /mnt/cgs-fs3/Sequencing/NextSeq_Output/160711_NS500125_0298_AHFW35BGXY/  
 >run_samplesheet = /mnt/cgs-fs3/Sequencing/NextSeq_Output/160711_NS500125_0298_AHFW35BGXY/SampleSheet.csv  
@@ -82,7 +82,7 @@ A file named 'analysis_info.txt' will be created in the folder. Open it in a tex
 >target_regions_bed =  
 >ncores = 8  
 
-Explanation of 'analysis_info.txt':
+Explanation of ```analysis_info.txt```:
 >Working directory = *\<path to directory of the analysis\>*  
 >run_folder = *\<path to the run folder\>*  
 >run_samplesheet = *\<sample sheet used to generate fastq files. This is created using the Illumina Expert Manager\>*  
@@ -92,19 +92,25 @@ Explanation of 'analysis_info.txt':
 >bismark_params = *\<parameters passed to the bismark script. Leave the default, and you can add additional parameters separated by ";"\>*  
 >methyl_extract_params= *\<parameters passed to the methyl extractor script. Leave the default, and you can add additional parameters separated by ";"\>*  
 >target_regions_bed = *\<path to bedfile\>*  
->ncores = *\<Number of cores to use to pararellize analysis\>*
+>ncores = *\<Number of cores to use in each slurm instance to pararellize analysis\>*
+>ninstances = *\<Number of slurm instances to run in parallel\>*
+>clean_files = *\<Should files be cleaned. True or False\>*
+
   
   
   
 
 ----
 ## Running the analysis
-All the analysis scripts are wrapped in the main python script **runMethylationAnalysis.py**. This main script takes an argument *--run*, which is used to indicate which section of the main script to run. The following commands are used to run the analysis with the main script:  
-  
-  
+All the analysis scripts are wrapped in the main python script ```runMethylationAnalysis.py```. This main script takes an argument ```--run```, which is used to indicate which section of the main script to run. A log file is created in the working directory called ```analysis.log```. 
 
+The analysis is intended to be run on a slurm cluster. The main script should be invoked without srun; this will then call ninstances of slurm, each with ncores. If the main script is invoked through srun, there will only be ncores available for subprocesses, which will be shared between the ninstances. If slurm is not installed, the script will still work, but slower.
+
+The following commands are used to run the analysis with the main script:  
+  
 ### Step 1
-1\. Using the command *--run step1_prepare_analysis*, the main script will read the analysis_info_file and run bcl2fastq, create a sample names file, and organize the working directory.
+1\. Using the command ```--run step1_prepare_analysis```, the main script will read the analysis_info_file and run bcl2fastq, create a sample names file, and organize the working directory.
+
 ```bash
 $ python bin/runMethylationAnalysis.py --run step1_prepare_analysis
 ```
@@ -112,67 +118,35 @@ Once it finishes, there will be a folder named rawReads with fastq files sorted 
   
   
 ### Step 2 
-2\. Using the command *--run step2_qc_and_trimming*, the main script will read the analysis_info_file, the sample_names file and run fastqc, create a folder Report/figure/rawQC with plots, create a folder Report/figure/data with tables, run trim galore, run fastqc on the trimmed reads, and create a folder Report/figure/trimmedQC with plots:
+2\. Using the command ```--run step2_qc_and_trimming```, the main script will read the analysis_info_file, the sample_names file and run fastqc, create a folder Report/figure/rawQC with plots, create a folder Report/figure/data with tables, run trim galore, run fastqc on the trimmed reads, and create a folder Report/figure/trimmedQC with plots:
+
 ```bash
 $ python bin/runMethylationAnalysis.py --run step2_qc_and_trimming
 ```
   
   
 ### Step 3
-3\. Using the command *--run step3_mapping_and_deduplication*, the main script will read the analysis_info_file, the sample_names file and run bismark and deduplication scripts. The output includes bam file (original and deduplicated), and log files of each sample, and will be saved in a folder alignedReads/ (created automatically).
+3\. Using the command ```--run step3_mapping_and_deduplication```, the main script will read the analysis_info_file, the sample_names file and run bismark and deduplication scripts. The output includes bam file (original and deduplicated), and log files of each sample, and will be saved in a folder alignedReads/ (created automatically).
 ```bash
 $ python bin/runMethylationAnalysis.py --run step3_mapping_and_deduplication.
 ```
 
 ### Step 4
-4\. Bismark outputs a bam file with the mapped reads and a report about the alignment.    
-The following command uses an executable Rscript which summarises mapping QC metrics. 
-
-Arguments:   
->Rscript bin/mappingQC.R *\<input folder containing bam files*\> *\<sample names file*\> *\<suffix pattern of report files output of bismark*\> *\<outdir*\>   
-
-Example:
+4\. After checking the QC metrics in ```Report/figure/mappingQC/```, extract the methylation data using the command ```--run step4_extract_methylation```.
 ```bash
-$ Rscript bin/mappingQC.R /mnt/research/jb393/MethylSeq_Pilot/Aligned_data/Raw_bam/ sample_names_all.txt _bismark_bt2_PE_report.txt Report/figure/mappingQC/
+$ python bin/runMethylationAnalysis.py --run step4_extract_methylation.
 ```
 
-
-### Step 5
-5\. Run the methylation extraction. You can change the parameters in the analysis_info.txt. Consider particularly --no_overlap for paired end reads.    
-```bash 
- $ python bin/methylationExtraction.py --out_dir alignedReads/
-```
 This creates 3 output files per sample: bedGraph.gz, bismark.cov.gz, and M-bias.txt.   
 There is also a log file per sample: methylExtract_log_sampleName.txt.   
-The M-bias.txt sample will be used in the next step to detect any bias in the %Methylation across the reads"'" positions.     
+The M-bias.txt sample will be used in the next step to detect any bias in the %Methylation across the reads"'" positions.  
+An mbias plot is created with the %Methylation across reads"'" positions.   
+Based on this plot, we need to decide whether or not to trim bases from 5p and 3p for each sample. A file will be created in the working director called ```mbias_remove_bases.txt```
 
+### Step 5
+7\. Fill in the file ```mbias_remove_bases.txt``` with information about which bases to clip from reads.   
 
-### Step 6
-6\. Run the mbias plot   
-
-Arguments:
->Rscript bin/methylExtractQC_mbias_plot.R *\<input folder containing .M-bias.txt files*\> *\<sample names file*\> *\<suffix pattern of M-bias.txt output of bismark*\> *\<name of output file*\>
-
-Example:
-```bash
- $ Rscript bin/methylExtractQC_mbias_plot.R alignedReads/ sample_names.txt .M-bias.txt Report/figure/methExtractQC/Mbias_plot.pdf
-```
-This creates a plot in the specified outdir with the %Methylation across reads"'" positions.   
-Based on this plot, we need to decide whether or not to trim bases from 5p and 3p for each sample. 
-
-
-
-### Step 7
-7\. Create and fill a file *mbias_remove_bases.txt* with information about which bases to clip from reads.   
-
-Arguments:
->python bin/remove_bases_file_info.py --outfile *\<name of output txt file*\>   
-
-Example:   
-```bash
- $ python bin/remove_bases_file_info.py --outfile remove_bases.txt
-```
-A file with the specified name will be created. Open the file and fill it with the following information (one sample per line):
+Open the file and fill it with the following information (one sample per line):
 >sample: *\<sample name*\>   
 >5R1: *\<number of bases to clip from the 5 prime end from read 1 (forward read)*\>  
 >3R1: *\<number of bases to clip from the 3 prime end from read 1 (reverse read)*\>   
@@ -180,21 +154,14 @@ A file with the specified name will be created. Open the file and fill it with t
 >3R2: *\<number of bases to clip from the 3 prime end from read 2 (reverse read)*\>   
 
 
-### Step 8
-8\. Run the methyl extraction again, removing biased bases from reads with information in mbias_remove_bases.txt.    
+### Step 6
+8\. Run the methyl extraction again. This will remove biased bases from reads using the information in  ```mbias_remove_bases.txt```.    
 
-Arguments:   
->python bin/methylationExtraction_removeBases.py --in_dir *\<path to folder containing bam files from bismark*\> --sample_names_file *\<file with sample names*\> --out_dir *\<output directory for the methylation extrated data*\> --remove_bases_file *\<file with bases to be clipped from reads (created in step 7)*\>   
-
-Example:   
 ```bash
- $ python bin/methylationExtraction_removeBases.py --in_dir alignedReads/--sample_names_file sample_names_test.txt --out_dir alignedReads/clipped/ --remove_bases_file mbias_remove_bases.txt
+$ python bin/runMethylationAnalysis.py --run step4_extract_methylation.
 ```
-
-Confirm that the clipping of bases worked:
-```bash
- $ Rscript bin/methylExtractQC_mbias_plot.R alignedReads/clipped/ sample_names.txt .M-bias.txt Report/figure/methExtractQC/Mbias_plot_clipped.pdf
-```
+The results will be output to ```Report/figure/methExtractQC/Mbias_plot_clipped.pdf```
+Confirm that the clipping of bases worked
 
 ***
 ***
@@ -213,5 +180,23 @@ Example:
  $ /usr/bin/Rscript bin/coverage_methExtractedData.R /mnt/research/jb393/MethylSeq_Pilot/Aligned_data/Raw_bam/methylationExtraction_clean/ Report/figure/methExtractQC/coverage_rawData_wg.pdf Report/figure/methExtractQC/coverage_rawData_tr.pdf /mnt/research/jb393/MethylSeq_Pilot/Kit_annotation/S03770311_Covered_GR38.bed
 ```
 
+### Step 2: Run BiSeq differential analysis 
+
+```bash
+ $ /usr/bin/Rscript bin/analyseMethylationPatterns.r sample_names.txt sample_groups.txt /mnt/research/bms41/methylSeq/aggressive/2017-06/methylExtraction/ NA tmpImages/ 10 35000 /mnt/cgs-fs3/Sequencing/Genome/Pig/ensembl/gtf/Sscrofa10.2/release-85/Sus_scrofa.Sscrofa10.2.85.gtf 50
+
+```
+
+During the beta regression step, the script will permit multi-node parallelisation using a secondary script:
+
+>tmpImages = *\<the temporary image folder for the regression\>*  
+>36 = *\<number of cores to use in this invokation\>*  
+>F = *\<T if this is the null regression step, or F if this is the first beta regression\>*  
 
 
+```bash
+ $ srun -c 20 --mem=20G /usr/bin/Rscript bin/parallelBetaRegression.r tmpImages 20 F
+
+```
+
+The main script will wait until all parallel instances have completed.
