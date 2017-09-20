@@ -72,7 +72,7 @@ if(!dir.exists(meta.env$temp.image.path)){
 meta.env$server = system("hostname", intern = TRUE)
 
 meta.env$log.file = paste0(meta.env$temp.image.path, "log.txt")
-cat("Running main on", meta.env$server, "\n", file=meta.env$log.file, append=TRUE)
+info( meta.env$log.file, paste0("Running main on ", meta.env$server))
 
 ##################
 #
@@ -92,12 +92,12 @@ func.env$runOrSkip = function(nextStepTempFile, tempFile, runFunction){
   if(!file.exists(paste0(meta.env$temp.image.path, nextStepTempFile))){
     tempFile = paste0(meta.env$temp.image.path, tempFile)
     if(file.exists(tempFile)){
-      cat("Loading temporary analysis file", tempFile,"...\n")
+      info( meta.env$log.file, paste0("Loading temporary analysis file... ", tempFile))
       runAndTime( f=function(){load(tempFile, envir = globalenv())} )
-      cat("Loaded temporary analysis file", tempFile,"...\n")
+      info( meta.env$log.file, paste0("Loaded temporary analysis file ", tempFile))
     } else{
-      RunAndTime(runFunction)
-      cat("Saving temporary analysis file", tempFile, "...\n")
+      runAndTime(runFunction)
+      info( meta.env$log.file, paste0("Saving temporary analysis file... ", tempFile))
 
       # Only save the data values - ensures updated functions will not be overwritten 
       runAndTime(f=function(){save(data.env, file = tempFile)})
@@ -106,19 +106,22 @@ func.env$runOrSkip = function(nextStepTempFile, tempFile, runFunction){
 }
 
 func.env$readSamples = function(){
-  cat("Reading sample names file ...\n")
+  info( meta.env$log.file, "Reading sample names file...")
+
   sampleInfo = read.table(meta.env$sample.info.file, sep="\t", header=F)
   rownames(sampleInfo) = as.character(sampleInfo$V1)
   colnames(sampleInfo) = c("Sample.Name")
   assign( "sampleInfo", sampleInfo, envir=data.env)
 
-  cat("Reading sample groups file ...\n")
+  info( meta.env$log.file, "Reading sample groups file...")
+
   sampleGroups = read.table(meta.env$sample.group.file, sep="\t", header=T)
   rownames(sampleGroups) = as.character(sampleGroups$Sample.Name)
   assign( "sampleGroups", sampleGroups, envir=data.env)
 
   # Locate coverage files
-  cat("Locating cov files ...\n")
+  info( meta.env$log.file, "Locating cov files...")
+
   cov.file.list = list.files(path=meta.env$cov.file.folder,pattern=".cov",full.names = T)
   cov.file.list = grep(paste0(c(as.character(sampleGroups$Sample.Name)),collapse='|'),
       cov.file.list, value=TRUE)
@@ -130,7 +133,7 @@ func.env$readSamples = function(){
 
 func.env$readTargetRegions = function(){
   # Read target region annotations
-  cat('Reading target regions\n')
+  info( meta.env$log.file, "Reading target regions")
 
   methylDataRaw.filter10 = filterByCov(data.env$methylDataRaw, minCov=10, global=F)
 
@@ -159,14 +162,13 @@ func.env$readTargetRegions = function(){
     methylDataRaw.filter10.rk = subsetByOverlaps(methylDataRaw.filter10, capture.region)
   }
  
-  # assign( "methylDataRaw.filter10.rk", methylDataRaw.filter10.rk, envir=data.env)
   assign( "methylDataRaw.filter10.rk", methylDataRaw.filter10.rk, envir=data.env) # ignore capture region
   rm(methylDataRaw, envir=data.env) # no longer needed
   rm(methylDataRaw.filter10, envir=data.env) # no longer needed
 }
 
 func.env$defineCpGClusters = function(){
-  cat('Defining Cpg clusters\n')
+  info( meta.env$log.file, "Defining Cpg clusters")
 
   # Within a BSraw object clusterSites searches for agglomerations of CpG sites
   # across all samples. In a first step the data is reduced to CpG sites covered
@@ -193,65 +195,12 @@ func.env$defineCpGClusters = function(){
 
   #   We then smooth the methylation values of CpG sites within the clusters with
   # the given bandwidth (h)
-  cat("Smoothing methylation ...\n")
+  info( meta.env$log.file, "Smoothing methylation...")
 
-  # This step does not properly use multiple cores. Each instance is mostly sleeping,
-  # with cpu time spent managing the processes. Time to run:
-
-  # Slurm? Cores   Time      Note
-  # Yes    30       03:11:19 Using 100% of one core, all in kernel mode.No target region filtering.
-  # Yes    6        00:39:12 Using 100% of one core
-  # No     6        00:36:13 Using 100% of one core
-  # No     1        01:46:03 Using ~23% of one core. Jobs alternate between running and sleeping. About 40mins of cpu time.
-  # Yes    1        02:11:33 Using ~25% of one core
-  #
-  # I think the problem is that mc.preschedule=FALSE in the mclapply call; one job is forked for each value of the data object,
-  # rather than splitting the job into ncores batches. From mclapply documentation on mc.preschedule:
-    # if set to TRUE then the computation is first divided to (at most) as many jobs are there are cores and then the jobs are started, 
-    # each job possibly covering more than one value. Better for short computations or large number of values in X.
-    # If set to FALSE then one job is forked for each value of X. 
-    # Better for jobs that have high variance of completion time and not too many values of X compared to mc.cores.
-
-  # This means that we should be able to speed this up by presplitting the data.limited object and running as new system calls 
-  # up to floor(ncores-1) instances
-  # data.limited.split = split(data.limited, ceiling(seq_along(data.limited)/meta.env$ncores), drop=TRUE)
-  # # Save each chunk
-  # saveChunks = function(chunk.data, chunk.name){
-  #   tempFile = paste0(meta.env$temp.image.path, "Limited", chunk.name, ".Rdata")
-  #   saveRDS(chunk.data, file = tempFile)
-  # }
-  # cat("Saving", length(chunk.names) , "data chunks to", meta.env$temp.image.path, "\n")
-  # invisible(mapply(saveChunks, data.limited.split, chunk.names))
-  # rm(data.limited.split)
-
-  # runPrediction = function(chunk.name){
-  #   tempFile = paste0(meta.env$temp.image.path, "Limited", chunk.name, ".result.Rdata")
-  #   data     = readRDS(tempFile)
-  #   result  = predictMeth(data, h=meta.env$dmr.bandwidth, mc.cores=6)
-  #   saveRDS(result, file = tempFile)
-  #   # This will save a BSRel object to file
-  # }
-  # command = "srun -c 1 /usr/bin/Rscript"
-  # system(command, wait = FALSE)
-
-  # Test the affinity mask of the process
-  # system(sprintf("taskset -p 0xffffffff %d", Sys.getpid()))
   predictedMeth = predictMeth(data.limited, h=meta.env$dmr.bandwidth, mc.cores=6)
-
-
-
   assign( "predictedMeth", predictedMeth, envir=data.env)
 
   rm(methylDataRaw.filter10.rk, envir=data.env)  #no longer needed
-
-  # makeSmoothPlot = function(sample.name){
-  #   png(file=paste0(temp.image.path,"Smoothed methylation", sample.name,".png"),width = 480, height=480)
-  #   plotMeth(object.raw = methylDataRaw[,rownames(methylDataRaw)==sample.name], object.rel = predictedMeth[,6], region = region,
-  #     lwd.lines = 2,
-  #     col.points = "blue",
-  #     cex = 1.5)
-  #   dev.off()
-  # }
 }
 
 func.env$betaRegressionOnChunk = function(chunk.name, is.null){
@@ -263,7 +212,8 @@ func.env$betaRegressionOnChunk = function(chunk.name, is.null){
     resultsFile = paste0(meta.env$temp.image.path, "Chunk", chunk.name, null.string, ".beta.Rdata")
 
     runRegression = function(obj){
-      cat("Chunk", chunk.name, "with", nrow(obj), "rows\n")
+      info( meta.env$log.file, paste("Chunk", chunk.name, "with", nrow(obj), "rows", sep=" "))
+
 
       ptm = proc.time()
 
@@ -281,14 +231,14 @@ func.env$betaRegressionOnChunk = function(chunk.name, is.null){
                         mc.cores=meta.env$ncores)
       }
       saveRDS(result, file = resultsFile)
-      time = PrintTimeTaken(proc.time() - ptm)
-      cat(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, "\n", file=meta.env$log.file, append=TRUE, sep = "\t")
+      time = printTimeTaken(proc.time() - ptm)
+      info(meta.env$log.file, paste(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, sep = "\t"))
       return()
     }
 
     loadChromosomeChunk = function(inputFile) {
       # Load the saved data chunk with the given name and run regression
-      cat("Loading data chunk", chunk.name, "\n")
+      info( meta.env$log.file, paste0("Loading data chunk ", chunk.name))
       return(readRDS(inputFile))
     }
 
@@ -306,7 +256,7 @@ func.env$betaRegressionOnChunk = function(chunk.name, is.null){
 
 func.env$runBetaRegression = function(){
   
-  cat("Running beta regression across", meta.env$ncores, "instances ...\n")
+  info( meta.env$log.file, paste("Running beta regression across", meta.env$ncores, "instances...", sep=" "))
 
   # To detect the CpG sites where the DNA methylation differs between case
   # and control samples we model the methylation within a beta regression with
@@ -324,7 +274,7 @@ func.env$runBetaRegression = function(){
   loadResultsChunk = function(chunk.name) {
     # Load the saved data chunk with the given name and run regression
     tempFile = paste0(meta.env$temp.image.path, "Chunk", chunk.name, ".beta.Rdata")
-    cat("Loading data chunk for chunk", chunk.name, "\n")
+    info( meta.env$log.file, paste("Loading data chunk for chunk", chunk.name, sep=" "))
     return(readRDS(tempFile))
   }
    
@@ -348,7 +298,7 @@ func.env$runBetaRegression = function(){
   # when the cluster was shut down. Benchmarking 20 cores or lower has not been completed.
   nchunks     = ceiling(length(data.env$predictedMeth)/meta.env$chunk.size)
   chunk.names = c(1:nchunks)
-  cat("Regression running on", nchunks, "chunks\n", file=meta.env$log.file, append=TRUE)
+  info( meta.env$log.file, paste("Regression running on", nchunks, "chunks", sep=" "))
   
   chunksSaved = function(){
     # This is a very basic test - it checks if the number of chunks present matches the expected
@@ -357,16 +307,15 @@ func.env$runBetaRegression = function(){
   }
 
   if(chunksSaved()){
-    cat("Reading existing", nchunks , "data chunks\n")
+    info( meta.env$log.file, paste("Reading existing", nchunks , "data chunks", sep=" "))
   } else {
-    cat("Saving", nchunks , "data chunks to", meta.env$temp.image.path, "\n")
+    info( meta.env$log.file, paste("Saving", nchunks , "data chunks to", meta.env$temp.image.path, sep=" "))
     predictedMeth.split = split(data.env$predictedMeth, ceiling(seq_along(data.env$predictedMeth)/meta.env$chunk.size), drop=TRUE)
     invisible(mapply(saveChunks, predictedMeth.split, chunk.names))
   }
 
   rm(predictedMeth.split)
-
-  cat("Parallel script can now be invoked\n")
+  info( meta.env$log.file, "Parallel script can now be invoked")
 
   # Process each chunk in turn
   invisible(lapply(chunk.names, func.env$betaRegressionOnChunk, F ))
@@ -381,19 +330,19 @@ func.env$runBetaRegression = function(){
     files = list.files(path=meta.env$temp.folder.name, pattern="Chunk\\d+.lck",full.names = T)
     length(files)==0
   }
-  cat("Waiting for other nodes to complete\n")
+  info( meta.env$log.file, "Waiting for other nodes to complete")
   while (!locksRemoved()) {
     Sys.sleep(1)
   }
 
-  cat("Loading results\n")
+  info( meta.env$log.file, "Loading results")
   betaResults.split   = lapply(chunk.names, loadResultsChunk )
   betaResults = do.call("rbind", betaResults.split)
   assign( "betaResults", betaResults, envir=data.env)
 }
 
 func.env$runNullBetaRegression = function(){
-  cat("Running resampled beta model regression for null hypothesis across", meta.env$ncores, "instances ...\n")
+  info( meta.env$log.file, paste("Running resampled beta model regression for null hypothesis across", meta.env$ncores, "instances ...", sep=" "))
 
   #   # The aim is to detect CpG clusters containing at least one differentially methylated location.
   #   # To do so the P values p from the Wald tests are transformed to Z scores which are normally 
@@ -416,7 +365,7 @@ func.env$runNullBetaRegression = function(){
   loadResultsChunk = function(chunk.name) {
     # Load the saved data chunk with the given name and run regression
     tempFile = paste0(meta.env$temp.image.path, "Chunk", chunk.name, ".null.beta.Rdata")
-    cat("Loading data chunk for chunk", chunk.name, "\n")
+    info( meta.env$log.file, paste("Loading data chunk for chunk", chunk.name, sep=" "))
     return(readRDS(tempFile))
   }
 
@@ -433,7 +382,7 @@ func.env$runNullBetaRegression = function(){
 
   colData(predictedMethNull)$group.null=rep(c(1,2), nrow(colData(predictedMethNull))/2)
 
-  cat("Selected samples for modelling\n")
+  info( meta.env$log.file, "Selected samples for modelling")
 
   nchunks     = ceiling(length(predictedMethNull)/meta.env$chunk.size)
   chunk.names = c(1:nchunks)
@@ -445,15 +394,15 @@ func.env$runNullBetaRegression = function(){
   }
 
   if(chunksSaved()){
-    cat("Reading existing", nchunks , "data chunks\n")
+    info( meta.env$log.file, paste("Reading existing", nchunks , "data chunks", sep=" "))
   } else {
-    cat("Saving", nchunks , "data chunks to", meta.env$temp.image.path, "\n")
+    info( meta.env$log.file, paste("Saving", nchunks , "data chunks to", meta.env$temp.image.path, sep=" "))
     predictedMethNull.split = split(predictedMethNull, ceiling(seq_along(predictedMethNull)/meta.env$chunk.size), drop=TRUE)
     invisible(mapply(saveChunks, predictedMethNull.split, chunk.names))
   }
 
   rm(predictedMethNull.split)
-  cat("Parallel script can now be invoked\n")
+  info( meta.env$log.file, "Parallel script can now be invoked")
 
   # Process each chunk in turn
   invisible(lapply(chunk.names, func.env$betaRegressionOnChunk, T ))
@@ -468,12 +417,12 @@ func.env$runNullBetaRegression = function(){
     files = list.files(path=meta.env$temp.folder.name, pattern="Chunk\\d+.null.lck",full.names = T)
     length(files)==0
   }
-  cat("Waiting for other nodes to complete\n")
+  info( meta.env$log.file, "Waiting for other nodes to complete")
   while (!locksRemoved()) {
     Sys.sleep(5)
   }
 
-  cat("Loading results\n")
+  info( meta.env$log.file, "Loading results")  
   betaResultsNull.split   = lapply(chunk.names, loadResultsChunk )
   
   betaResultsNull = do.call("rbind", betaResultsNull.split)
@@ -490,10 +439,20 @@ func.env$runNullBetaRegression = function(){
   dev.off()
 }
 
+#' Quit the script so the variogram can be examined.
+#' @title Save and quit 
+#' @export
+func.env$quitForVar = function(){
+    save(data.env, file = paste0(meta.env$temp.image.path, "Variogram.RData"))
+    info( meta.env$log.file, "Quitting so you can examine the variogram")  
+    quit(save="no", status=0)
+}
+
+
 func.env$smoothValues = function(){
   
-  sill_value= 0.20
-  cat("Smoothing with sill value",sill_value,"...\n")
+  sill_value= 0.30
+  info( meta.env$log.file, paste("Smoothing with sill value",sill_value,"..."))  
   # It is necessary to smooth the variogram. Especially for greater h the variogram 
   # tends to oscillate strongly. This is the reason why the default bandwidth 
   # increases with increasing h. Nevertheless, the smoothed variogram may further 
@@ -530,7 +489,7 @@ func.env$smoothValues = function(){
   # clusters:
   clusters.rej     = testClusters(locCor, FDR.cluster=0.1)
 
-  cat('Trimming clusters\n')
+  info( meta.env$log.file, 'Trimming clusters')  
   # Error in IRanges with negative width. Remove row 50345
   # idx <- GenomicRanges:::get_out_of_bound_index(ext_grn)
   # if (length(idx) != 0L)
@@ -547,7 +506,7 @@ func.env$smoothValues = function(){
   # the methylation difference switches from positive to negative, or vice versa, if 
   # diff.dir = TRUE. That way we ensure that within a DMR all CpG sites are hypermethylated, 
   # and hypomethylated respectively.
-  cat('Finding DMRs\n')
+  info( meta.env$log.file, 'Finding DMRs')
   DMRs    = findDMRs(clusters.trimmed, max.dist=100, diff.dir=T)
   assign( "DMRs", DMRs, envir=data.env)
 
@@ -556,7 +515,7 @@ func.env$smoothValues = function(){
 }
 
 func.env$findOverlapsWithGTF = function(){
-  cat('Finding DMR overlaps with genes\n')
+  info( meta.env$log.file, "Finding DMR overlaps with genes") 
 
   merge_hits=function(x){
     data.frame(seqnames=x$seqnames[1], start=x$start[1], end=x$end[1], width=x$width[1],
@@ -596,7 +555,7 @@ func.env$findOverlapsWithGTF = function(){
     write.table(file=paste0(meta.env$temp.image.path, "DMRs_annotated_kit.tsv"),   sep="\t",row.names = F, DMRs.annotated.kit)
   }
 
-  cat("Plotting DMRs\n")
+  info( meta.env$log.file, "Plotting DMRs") 
   outputDir = paste0(dirname(meta.env$sample.info.file),"/DMR_images/")
   if(!dir.exists(outputDir)){
     dir.create(outputDir)
@@ -654,10 +613,10 @@ func.env$findOverlapsWithGTF = function(){
 
 # The order in which functions should be run
 func.env$func.order = c(func.env$readSamples, func.env$readTargetRegions, func.env$defineCpGClusters, func.env$runBetaRegression,
-  func.env$runNullBetaRegression, func.env$smoothValues, func.env$findOverlapsWithGTF)
+  func.env$runNullBetaRegression, func.env$quitForVar, func.env$smoothValues, func.env$findOverlapsWithGTF)
 # The corresponding save points
 func.env$func.names = c("Read_files.RData", "Filtered_methylation.RData", "Predicted_methylation.RData", "Beta_regression.RData",
-  "Beta_regression_null.RData", "DMRs_found.RData", "Overlaps_with_GTF.RData", "end.RData")
+  "Beta_regression_null.RData", "Variogram.RData", "DMRs_found.RData", "Overlaps_with_GTF.RData", "end.RData")
 
 for( i in 1:length(func.env$func.order)){
   thisFile = func.env$func.names[i]

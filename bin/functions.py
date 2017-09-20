@@ -122,14 +122,14 @@ def get_strand(strand):
 def slash_terminate(s):
     '''Add a trailing '/' to the string if not present
     '''
-    return(s if s.endsWith('/') else s + '/')
+    return(s if s.endswith('/') else s + '/')
 
 def runAndCheck(cmd, msg):
     '''Run the given command and check the return value.
 
-        The script will print the given error message and quit 
-        with exit code 1 if the command did not return
-        exit code 0
+        If the return value of the command is not 0 (success),
+        print the given error message and quit with
+        exit code 1.
 
         --cmd - the command to be run
         --msg - the message to print if the command returns an error
@@ -148,9 +148,15 @@ def runAndCheck(cmd, msg):
         sys.exit(1)
 
 def srun(cmd, ncores="1", mem=""):
-    '''Run the given command through srun with the given number of
-    cores and memory in Gb. If srun is not installed, invokes the 
-    command directly.
+    '''Run the given command through srun.
+
+    If srun is available, the command will be run
+    with the given cores and memory. If srun is not
+    installed, the command is invoked directly.
+
+    --cmd - the command to be run
+    --ncores - the number of cores
+    --mem - the memory in Gb
     '''
     logger = logging.getLogger("runMethylationAnalysis.functions")
     if(srun_is_installed()):

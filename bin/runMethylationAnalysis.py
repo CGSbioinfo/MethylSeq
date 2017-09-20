@@ -1,6 +1,7 @@
 #!/usr/bin/env python 
 
 import os
+import os.path
 import sys
 import re
 import errno
@@ -26,11 +27,6 @@ def step_1():
     Checks the info files, runs bcl2fastq, and creates the sample names file
     for future scripts.
     '''
-
-    if not validation.validateAnalysisInfo(args.analysis_info_file):
-        logger.error("Analysis info file failed validation")
-        sys.exit(1)
-
     if not validation.validateSampleSheet(args.analysis_info_file):
         logger.error("Sample sheet failed validation")
         sys.exit(1)
@@ -71,10 +67,6 @@ def step_3():
     Maps and deduplicates reads with bismark, and creates mapping 
     QC plots.
     '''
-    if not validation.validateAnalysisInfo(args.analysis_info_file):
-        logger.error("Analysis info file failed validation")
-        sys.exit(1)
-
     logger.info("Running alignment")
     mapping.map_reads(run='bismark_alignment')
 
@@ -103,7 +95,6 @@ def step_4():
     invokations.create_remove_bases_file_info("remove_bases.txt")
     logger.info("Finished running step 4")
 
-
 def setupLogger():
     '''Configure the logger. 
 
@@ -126,6 +117,14 @@ def setupLogger():
     logger.addHandler(sh)
     return(logger)
 
+def check_info_file():
+    ''' Check that the analysis info file is valid.
+        Quit if file is not valid
+    '''
+    if not validation.validateAnalysisInfo(args.analysis_info_file):
+        logger.error("Analysis info file failed validation")
+        sys.exit(1)
+
 def runTests():
     ''' Run tests
     '''
@@ -138,10 +137,6 @@ def noArgs():
     print "No run argument was supplied!"
     print "Use --help to see valid parameters."
     sys.exit(1)  
-
-
-def makeInfoFile():
-    invokations.create_analysis_info_file(args.analysis_info_file)
 
 def makeRemoveFile():
     invokations.create_remove_bases_file_info("remove_bases.txt")
@@ -158,16 +153,28 @@ if __name__ == '__main__':
 
     # Choose a section of the pipeline to run
     parser.add_argument('--run', 
-        help='Choose a section of the pipeline to run. Possible options: create_info, create_remove_file, step1_prepare_analysis, step2_qc_and_trimming, step3_mapping_and_deduplication, step4_extract_methylation', 
+        help='Choose a section of the pipeline to run. Possible options: step0_create_info, step1_prepare_analysis, step2_qc_and_trimming, step3_mapping_and_deduplication, step4_extract_methylation, step5_extract_methylation, create_remove_file', 
         default='')
 
-    # Parse arguments
     args=parser.parse_args()
+
+    if(args.run=='step0_create_info'):
+        invokations.create_analysis_info_file(args.analysis_info_file)
+        print "Analysis file created"
+        print "Fill in the file before running step 1"
+        sys.exit(0)
+
+
+    if(not os.path.isfile(args.analysis_info_file)):
+        print "Analysis file '%s' not found" % args.analysis_info_file
+        print "Run step 0 and try again"
+        sys.exit(1)
+
     logger = setupLogger()
+    check_info_file()
 
     # Run the command input
-    argDict = { 'create_info': makeInfoFile,
-                'step1_prepare_analysis': step_1,
+    argDict = { 'step1_prepare_analysis': step_1,
                 'step2_qc_and_trimming': step_2,
                 'step3_mapping_and_deduplication': step_3,
                 'step4_extract_methylation': step_4,

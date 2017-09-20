@@ -4,6 +4,7 @@ import os
 import sys
 import functions
 import argparse
+import csv
 
 __version__='v01'
 
@@ -114,6 +115,7 @@ def checkExperimentName(name):
 
         name -- the experiment name to test
     '''
+    illegalChars = [ "." ]
     ok = True
     for char in illegalChars:
         if char in name:
@@ -130,16 +132,14 @@ def validateSampleSheet(analysis_info_file):
     otherwise the script will exit with status 0.
     '''
 
-    ai=functions.read_analysis_info_file(args.analysis_info_file)
+    ai=functions.read_analysis_info_file(analysis_info_file)
 
     ok = True;
     
     sampleSheet = ai['run_samplesheet']
 
     nameKey = "Experiment Name"
-
-    illegalChars = [ "." ]
-        
+    
     with open(sampleSheet, 'rb') as csvfile:
         reader = csv.reader(csvfile, delimiter=',', quotechar='|')
         for row in reader:

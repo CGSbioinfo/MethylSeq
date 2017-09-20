@@ -76,7 +76,8 @@ def _tables(i):
 def _plots(i, in_dir, readType, out_dir_report, suffix_name, plot_device):
     logger = logging.getLogger("runMethylationAnalysis.plotting")
     logger.info("Making plots for "+i)
-    functions.srun('/usr/bin/Rscript bin/create_fastqcPlots_perSample.R ' + in_dir + ' ' + i + ' ' + readType + ' ' + out_dir_report + ' ' + suffix_name + ' ' + plot_device)
+    cmd = '/usr/bin/Rscript bin/create_fastqcPlots_perSample.R ' + in_dir + ' ' + i + ' ' + readType + ' ' + out_dir_report + ' ' + suffix_name + ' ' + plot_device
+    functions.srun(cmd)
 
 def fastqc_tables_and_plots(analysis_info_file='analysis_info.txt', 
     in_dir='rawReads/', 

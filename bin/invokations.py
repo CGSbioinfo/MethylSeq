@@ -17,7 +17,11 @@ import subprocess
 import functions
 
 def create_analysis_info_file(analysis_info_file="analysis_info.txt"):
-    lines=['working_directory = ', 'run_folder = ', 'run_samplesheet = ', 'bcl2fastq_output = fastq/ ', 'readType = pairedEnd', 'reference_genome = ', 'bismark_params = --bowtie2; --bam; -N 0; -L 20; -D 15; -R 2; --score_min L,0,-0.2; ', 'methyl_extract_params= --bedGraph; --gzip; --merge_non_CpG;', 'target_regions_bed = ', 'ncores = 8']
+    lines=['working_directory = ', 'run_folder = ', 'run_samplesheet = ', 'bcl2fastq_output = fastq/ ', 
+    'readType = pairedEnd', 'reference_genome = ', 
+    'bismark_params = --bowtie2; --bam; -N 0; -L 20; -D 15; -R 2; --score_min L,0,-0.2; ', 
+    'methyl_extract_params= --bedGraph; --gzip; --merge_non_CpG;', 'target_regions_bed = ', 'ncores = 8', 
+    'ninstances = 3', 'clean_files = False']
     outfile=open(analysis_info_file,'w')
     for l in lines:
         outfile.write(l + '\n')
@@ -46,11 +50,11 @@ def invoke_bcl2fastq(analysis_info_file):
     it will quit with exit code 0
     '''
 
-    ai=functions.read_analysis_info_file(args.analysis_info_file)
+    ai=functions.read_analysis_info_file(analysis_info_file)
 
     cmdStr = "bcl2fastq -R " + ai['run_folder'] + " -o " + ai['bcl2fastq_output'] + " --no-lane-splitting -l NONE --sample-sheet " + ai['run_samplesheet']
 
-    functions.srun(cmdStr, ncores=ai['ncores'])
+    functions.srun(cmdStr, ncores=ai['ncores'], mem=20)
     # functions.runAndCheck(cmdStr, "Error in bcl2fastq")
 
 
@@ -100,7 +104,7 @@ def _moveReads(sampleNames, fastq):
 def organize_working_directory(analysis_info_file='analysis_info.txt', sample_names_file='sample_names.txt', in_dir='bcl2fastq_output'):
 
     # Read analysis info file
-    ai=functions.read_analysis_info_file(args.analysis_info_file)
+    ai=functions.read_analysis_info_file(analysis_info_file)
 
     # Read sample names
     sampleNames = functions.read_sample_names(sample_names_file)
@@ -258,7 +262,7 @@ def trim_reads(analysis_info_file='analysis_info.txt',
     functions.srun(cmd_str)
 
 
-def _methylationExtraction(i, ai, remove_bases_dict, dedup, cx):
+def _methylationExtraction(i, ai, in_dir, out_dir, remove_bases_dict, dedup, cx):
     '''
     Run the bismark methylation extraction on the given sample.in_dir
 
@@ -267,7 +271,7 @@ def _methylationExtraction(i, ai, remove_bases_dict, dedup, cx):
     '''
     logger = logging.getLogger("runMethylationAnalysis.invokations")
     params=ai['methyl_extract_params'].replace(';','')
-    alignedReads = os.listdir(in_dir + "/")
+    alignedReads = os.listdir(in_dir)
     alignedReads = [alignedReads[y] for y, x in enumerate(alignedReads) if re.findall(i, x)]
     if not alignedReads:
         logger.warning("No aligned reads found for %s." % i)
@@ -301,13 +305,14 @@ def _methylationExtraction(i, ai, remove_bases_dict, dedup, cx):
 
     # Create the ignore string if needed
     if(remove_bases_dict):
+        logger.info("Clipping bases for %s" % i)
         basesInfo=remove_bases_dict[i]
-        logFile = ("%s/methylExtract_REMOVEDBASES_log_%s.txt"
+        logFile = ("%smethylExtract_REMOVEDBASES_log_%s.txt"
             % (out_dir, i))
         ignoreString = (" --ignore %s --ignore_3prime %s --ignore_r2 %s --ignore_3prime_r2 %s "
             % (basesInfo[0], basesInfo[1], basesInfo[2], basesInfo[3]))
     else:
-        logFile = ("%s/methylExtract_log_%s.txt"
+        logFile = ("%smethylExtract_log_%s.txt"
             % (out_dir, i))
         ignoreString = ""
 
@@ -317,10 +322,10 @@ def _methylationExtraction(i, ai, remove_bases_dict, dedup, cx):
     param_string = ('--multicore %s %s %s --output %s %s' %
         ( ai['ncores'], params, cx_string, out_dir, ignoreString ))
 
-    cmdStr = ('bismark_methylation_extractor %s %s &>%s'
-            % (param_string, bamFile, logFile ))
+    cmdStr = ('bismark_methylation_extractor %s %s &>%s' % (param_string, bamFile, logFile ))
     logger.info("Extracting methylation from "+i)
     functions.srun(cmdStr, ncores=ai['ncores'], mem=20)
+    logger.info("Extracted methylation from "+i)
 
 
 def _createRemoveBaseDict(remove_bases_file):
@@ -341,15 +346,15 @@ def _createRemoveBaseDict(remove_bases_file):
     return remove_bases_dict
 
 
-def _makeMbiasPlots():
+def _makeMbiasPlots(remove_bases_dict, out_dir, sample_names_file):
     '''Call the R script to generate methylation bias plots.
     '''
     logger = logging.getLogger("runMethylationAnalysis.invokations")
-    clipped = "_clipped.pdf" if remove_bases_dict else ""
+    clipped = "_clipped" if remove_bases_dict else ""
     out_file = "Report/figure/methExtractQC/Mbias_plot%s.pdf" % clipped
 
     cmdStr = ('/usr/bin/Rscript bin/methylExtractQC_mbias_plot.R %s %s .M-bias.txt %s'
-            % (out_dir, args.sample_names_file, out_file))
+            % (out_dir, sample_names_file, out_file))
     logger.info("Making M-bias plots")
     functions.srun(cmdStr)
        
@@ -359,7 +364,7 @@ def extract_methylation(analysis_info_file='analysis_info.txt',
     sample_names_file='sample_names.txt',
     dedup=False,
     cx=False,
-    remove_bases_file='mbias_remove_bases.txt'):
+    remove_bases_file='remove_bases.txt'):
 
     logger = logging.getLogger("runMethylationAnalysis.invokations")
     ai=functions.read_analysis_info_file(analysis_info_file)
@@ -372,6 +377,10 @@ def extract_methylation(analysis_info_file='analysis_info.txt',
     sampleNames = functions.read_sample_names(sample_names_file)
 
     # Set input and output directories
+    path    = functions.slash_terminate(path)
+    in_dir  = functions.slash_terminate(in_dir)
+    out_dir = functions.slash_terminate(out_dir)
+    
     in_dir = path + in_dir
 
     if not os.path.exists(in_dir):
@@ -385,7 +394,7 @@ def extract_methylation(analysis_info_file='analysis_info.txt',
     # Read remove bases file
     remove_bases_dict = _createRemoveBaseDict(remove_bases_file)
 
-    Parallel(n_jobs=ninstances)(delayed(_methylationExtraction)(i,ai, remove_bases_dict, dedup, cx) for i in sampleNames)
+    Parallel(n_jobs=ninstances)(delayed(_methylationExtraction)(i, ai, in_dir, out_dir,remove_bases_dict, dedup, cx) for i in sampleNames)
 
     # Create the QC plots
-    _makeMbiasPlots()
+    _makeMbiasPlots(remove_bases_dict, out_dir, sample_names_file)

@@ -56,17 +56,19 @@ def _alignment(sampleName, ai, in_dir, out_dir, gz):
     # Check read 2 is present when needed
     if(ai['readType']=='pairedEnd'):
         if not r2:
-            logger.info("No read 2 file found when readType is paired end. Ignoring %s." % sampleName)
+            logger.warning("No read 2 file found when readType is paired end. Ignoring %s." % sampleName)
             return
 
     if r2: 
         r2 = in_dir + r2[0]
-        cmdStr = ('bismark %s --output_dir %s %s -1 %s -2 %s &>%s/bismark_log_%s.txt' 
+        cmdStr = ('bismark %s --output_dir %s %s -1 %s -2 %s &>%sbismark_log_%s.txt' 
             % ( bismark_params, out_dir, ai['reference_genome'], r1, r2, out_dir, sampleName ))
+        logger.info("Aligning %s" % sampleName)
         functions.srun(cmdStr, ai['ncores'], 40)
     else:
-        logger.info("No read 2 for %s." % sampleName)
+        logger.info("No read 2 for %s" % sampleName)
         logger.warning("Single reads not currently implemented")
+    logger.info("Alignment complete for %s" % sampleName)
         # r1 = in_dir + [trimmedReads[y] for y, x in enumerate(trimmedReads) if re.findall( "_R1_.*val_1.fq", x)][0]
         # print "Found "+str(len(r1))+" r1 files"
         # cmdStr = str("srun -c %(ncores)i -mem=20G bismark " + bismark_params + " --output_dir " + out_dir + " " + ai['reference_genome'] +" -1 " + r1 + " -2 " + r2 + " &>" + out_dir + "/bismark_log_"+sampleName+".txt ")
@@ -75,8 +77,11 @@ def _alignment(sampleName, ai, in_dir, out_dir, gz):
 def _deduplicate(sampleName, ai, in_dir, out_dir):
     '''Perform deduplication of reads using Bismark params.
 
-    The function checks if the required bam file exists before running.
-    sampleName -- the name of the sample to process
+        The function checks if the required bam file exists before running.
+        --sampleName - the name of the sample to process
+        --ai - the analysis options
+        --in_dir - the input directory
+        --out_dir - the output directory
     '''
     logger = logging.getLogger("runMethylationAnalysis.mapping")
     alignedReads = os.listdir(out_dir)
@@ -98,12 +103,14 @@ def _deduplicate(sampleName, ai, in_dir, out_dir):
 
     bamFile = out_dir + bamFiles[0]
 
-    cmdStr = ('deduplicate_bismark --bam %s &>%s/dedup_log_%s.txt' 
+    cmdStr = ('deduplicate_bismark --bam %s &>%sdedup_log_%s.txt' 
             % (bamFile, out_dir, sampleName ))
 
     alignedReads = [alignedReads[y] for y, x in enumerate(alignedReads) if re.findall(sampleName, x)]
     
+    logger.info("Deduplicating %s" % sampleName)
     functions.srun(cmdStr, ai['ncores'], 40)
+    logger.info("Deduplication complete for %s" % sampleName)
 
 def map_reads(analysis_info_file='analysis_info.txt', 
     in_dir='trimmedReads/', 
@@ -158,6 +165,6 @@ def map_reads(analysis_info_file='analysis_info.txt',
         Parallel(n_jobs=ninstances)(delayed(_alignment)(i, ai, in_dir, out_dir, gz) for i in sampleNames)
 
     # Run deduplication
-    if args.run == 'all' or args.run == 'deduplicate_bismark':
+    if run == 'all' or run == 'deduplicate_bismark':
         logger.info("Running deduplication")
         Parallel(n_jobs=ninstances)(delayed(_deduplicate)(i, ai, in_dir, out_dir) for i in sampleNames)

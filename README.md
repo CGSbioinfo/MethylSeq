@@ -51,14 +51,14 @@ Important note: Most python scripts have a help page, so if unsure on how to use
 This should print on your terminal screen the MethylSeq-master folder
   
   
-**5**\. From your currect directory, unzip the file (Note that /home/mjg225/ should be replaced with your own home directory):
+**5**\. From your currect directory, unzip the file (Note that ```/home/mjg225/``` should be replaced with your own home directory):
 ```bash
  $ unzip /home/mjg225/Downloads/MethylSeq-master
 ```
-A folder named "MethylSeq-master" should appear. Check by just typing ls.
+A folder named ```MethylSeq-master``` should appear. Check by just typing ls.
   
   
-**6**\. Move the contents of MethylSeq-master/bin to bin/
+**6**\. Move the contents of ```MethylSeq-master/bin``` to ```bin/```
 ```bash
  $ mv MethylSeq-master/bin/* bin/
 ```
@@ -80,7 +80,9 @@ A file named ```analysis_info.txt``` will be created in the folder. Open it in a
 >bismark_params = --bowtie2; --bam; --directional; -N 0; -L 20; --no-mixed; --no-discordant; -D 15; -R 2; --score_min L,0,-0.2;  
 >methyl_extract_params= --bedGraph; --gzip; --merge_non_CpG;  
 >target_regions_bed =  
->ncores = 8  
+>ncores = 8
+>ninstances = 3
+>clean_files = False
 
 Explanation of ```analysis_info.txt```:
 >Working directory = *\<path to directory of the analysis\>*  
@@ -93,7 +95,9 @@ Explanation of ```analysis_info.txt```:
 >methyl_extract_params= *\<parameters passed to the methyl extractor script. Leave the default, and you can add additional parameters separated by ";"\>*  
 >target_regions_bed = *\<path to bedfile\>*  
 >ncores = *\<Number of cores to use in each slurm instance to pararellize analysis\>*
+
 >ninstances = *\<Number of slurm instances to run in parallel\>*
+
 >clean_files = *\<Should files be cleaned. True or False\>*
 
   
@@ -118,7 +122,7 @@ Once it finishes, there will be a folder named rawReads with fastq files sorted 
   
   
 ### Step 2 
-2\. Using the command ```--run step2_qc_and_trimming```, the main script will read the analysis_info_file, the sample_names file and run fastqc, create a folder Report/figure/rawQC with plots, create a folder Report/figure/data with tables, run trim galore, run fastqc on the trimmed reads, and create a folder Report/figure/trimmedQC with plots:
+2\. Using the command ```--run step2_qc_and_trimming```, the main script will read the analysis_info_file, the sample_names file and run fastqc, create a folder ```Report/figure/rawQC``` with plots, create a folder ```Report/figure/data``` with tables, run trim galore, run fastqc on the trimmed reads, and create a folder ```Report/figure/trimmedQC``` with plots:
 
 ```bash
 $ python bin/runMethylationAnalysis.py --run step2_qc_and_trimming
@@ -137,11 +141,9 @@ $ python bin/runMethylationAnalysis.py --run step3_mapping_and_deduplication.
 $ python bin/runMethylationAnalysis.py --run step4_extract_methylation.
 ```
 
-This creates 3 output files per sample: bedGraph.gz, bismark.cov.gz, and M-bias.txt.   
-There is also a log file per sample: methylExtract_log_sampleName.txt.   
-The M-bias.txt sample will be used in the next step to detect any bias in the %Methylation across the reads"'" positions.  
-An mbias plot is created with the %Methylation across reads"'" positions.   
-Based on this plot, we need to decide whether or not to trim bases from 5p and 3p for each sample. A file will be created in the working director called ```mbias_remove_bases.txt```
+This creates 3 output files per sample: ```bedGraph.gz```, ```bismark.cov.gz```, and ```M-bias.txt```.   
+There is also a log file per sample: ```methylExtract_log_sampleName.txt```.   
+The M-bias.txt sample is used to detect any bias in the %Methylation across the reads positions.  The data is plotted in the files ```Report/figure/methExtractQC/Mbias_plot.pdf```. Based on this plot, we need to decide whether or not to trim bases from 5p and 3p for each sample. A file will be created in the working director called ```mbias_remove_bases.txt```
 
 ### Step 5
 7\. Fill in the file ```mbias_remove_bases.txt``` with information about which bases to clip from reads.   
@@ -153,12 +155,11 @@ Open the file and fill it with the following information (one sample per line):
 >5R2: *\<number of bases to clip from the 5 prime end from read 2 (forward read)*\>   
 >3R2: *\<number of bases to clip from the 3 prime end from read 2 (reverse read)*\>   
 
-
 ### Step 6
 8\. Run the methyl extraction again. This will remove biased bases from reads using the information in  ```mbias_remove_bases.txt```.    
 
 ```bash
-$ python bin/runMethylationAnalysis.py --run step4_extract_methylation.
+$ python bin/runMethylationAnalysis.py --run step5_extract_methylation.
 ```
 The results will be output to ```Report/figure/methExtractQC/Mbias_plot_clipped.pdf```
 Confirm that the clipping of bases worked
@@ -182,6 +183,9 @@ Example:
 
 ### Step 2: Run BiSeq differential analysis 
 
+>/usr/bin/Rscript bin/analyseMethylationPatterns.r *\<sample_names_file*\> *\<sample_groups_file*\> *\<methyl_data_folder*\> *\<target_region_file*\> *\<temp_folder*\> *\<ncores*\> *\<chunk_size*\> *\<gene_annotation_gtf_file*\> *\<dmr_bandwidth*\>
+
+Example:
 ```bash
  $ /usr/bin/Rscript bin/analyseMethylationPatterns.r sample_names.txt sample_groups.txt /mnt/research/bms41/methylSeq/aggressive/2017-06/methylExtraction/ NA tmpImages/ 10 35000 /mnt/cgs-fs3/Sequencing/Genome/Pig/ensembl/gtf/Sscrofa10.2/release-85/Sus_scrofa.Sscrofa10.2.85.gtf 50
 
@@ -189,9 +193,11 @@ Example:
 
 During the beta regression step, the script will permit multi-node parallelisation using a secondary script:
 
->tmpImages = *\<the temporary image folder for the regression\>*  
->36 = *\<number of cores to use in this invokation\>*  
->F = *\<T if this is the null regression step, or F if this is the first beta regression\>*  
+> /usr/bin/Rscript bin/parallelBetaRegression.r *\<temp_folder*\> *\<ncores*\> *\<is_null_regression*\>
+
+>temp_folder = *\<the temporary folder for the regression\>*  
+>ncores = *\<number of cores to use in this invokation\>*  
+>is_null_regression = *\<T if this is the null regression step, or F if this is the first beta regression\>*  
 
 
 ```bash
@@ -200,3 +206,5 @@ During the beta regression step, the script will permit multi-node parallelisati
 ```
 
 The main script will wait until all parallel instances have completed.
+
+Detected DMRs will be exported to ```DMR_images/```.

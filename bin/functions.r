@@ -78,12 +78,13 @@ printEnvironmentSize = function(env){
     }
 }
 
-#' Log a message to file with the current time
+#' Log a message to console and file with the current time
 #' @param file the target file
 #' @param msg the message
 #' @export
 logToFile = function(file, msg){
-    cat(paste(Sys.time(), msg, sep="\t"), file=file, append=TRUE)
+    cat(msg, "\n")
+    cat(paste(Sys.time(), msg, "\n", sep="\t"), file=file, append=TRUE)
 }
 
 #' Log a message to file with log level INFO
