@@ -95,6 +95,22 @@ def step_4():
     invokations.create_remove_bases_file_info("remove_bases.txt")
     logger.info("Finished running step 4")
 
+def step_5():
+    '''Extract methylation data from the mapped reads using a remove bases file
+    '''
+    logger.info("Extracting methlyation data with read trimming")
+    invokations.extract_methylation(args.analysis_info_file)
+    invokations.calculate_coverage(args.analysis_info_file)
+    logger.info("Finished running step 5")
+
+def step_6():
+    '''Run differential methylation analysis
+    '''
+    logger.info("Running differential methylation analysis")
+    invokations.analyse_methylation(args.analysis_info_file)
+    logger.info("Finished running step 6")
+
+
 def setupLogger():
     '''Configure the logger. 
 
@@ -153,7 +169,7 @@ if __name__ == '__main__':
 
     # Choose a section of the pipeline to run
     parser.add_argument('--run', 
-        help='Choose a section of the pipeline to run. Possible options: step0_create_info, step1_prepare_analysis, step2_qc_and_trimming, step3_mapping_and_deduplication, step4_extract_methylation, step5_extract_methylation, create_remove_file', 
+        help='Choose a section of the pipeline to run. Possible options: step1_prepare_analysis, step2_qc_and_trimming, step3_mapping_and_deduplication, step4_extract_methylation, step5_extract_methylation, step6_analyse_methylation, create_remove_file', 
         default='')
 
     args=parser.parse_args()
@@ -178,7 +194,8 @@ if __name__ == '__main__':
                 'step2_qc_and_trimming': step_2,
                 'step3_mapping_and_deduplication': step_3,
                 'step4_extract_methylation': step_4,
-                'step5_extract_methylation': step_4, # deliberately same as 4, see readme
+                'step5_extract_methylation': step_5,
+                'step6_analyse_methylation': step_6,
                 'test': runTests,
                 '': noArgs,
                 'create_remove_file': makeRemoveFile }

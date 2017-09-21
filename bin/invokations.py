@@ -20,8 +20,8 @@ def create_analysis_info_file(analysis_info_file="analysis_info.txt"):
     lines=['working_directory = ', 'run_folder = ', 'run_samplesheet = ', 'bcl2fastq_output = fastq/ ', 
     'readType = pairedEnd', 'reference_genome = ', 
     'bismark_params = --bowtie2; --bam; -N 0; -L 20; -D 15; -R 2; --score_min L,0,-0.2; ', 
-    'methyl_extract_params= --bedGraph; --gzip; --merge_non_CpG;', 'target_regions_bed = ', 'ncores = 8', 
-    'ninstances = 3', 'clean_files = False']
+    'methyl_extract_params= --bedGraph; --gzip; --merge_non_CpG;', 'target_regions_bed = ', 'ncores = 10', 
+    'ninstances = 3', 'clean_files = False', 'sill = 1', 'dmr_bandwidth = 50', 'gtf_file = ']
     outfile=open(analysis_info_file,'w')
     for l in lines:
         outfile.write(l + '\n')
@@ -398,3 +398,42 @@ def extract_methylation(analysis_info_file='analysis_info.txt',
 
     # Create the QC plots
     _makeMbiasPlots(remove_bases_dict, out_dir, sample_names_file)
+
+
+def calculate_coverage(analysis_info_file='analysis_info.txt',
+    cov_dir='alignedReads/'):
+
+    logger = logging.getLogger("runMethylationAnalysis.invokations")
+    ai=functions.read_analysis_info_file(analysis_info_file)
+
+    wg_output = 'Report/figure/methExtractQC/coverage_rawData_wg.pdf'
+    tr_output = 'Report/figure/methExtractQC/coverage_rawData_tr.pdf'
+
+    cmdStr = ('/usr/bin/Rscript bin/coverage_methExtractedData.r  %s %s %s %s '
+        %(cov_dir, wg_output, tr_output, ai['target_regions_bed']))
+
+    logger.info("Calculating coverage in genome and target regions")
+    functions.srun(cmdStr)
+
+
+
+def analyse_methylation(analysis_info_file='analysis_info.txt',
+    cov_dir='alignedReads/', 
+    sample_group_file='sample_groups.txt',
+    temp_folder_name='tmpImages/',
+    chunk_size=20000):
+
+    logger = logging.getLogger("runMethylationAnalysis.invokations")
+    ai=functions.read_analysis_info_file(analysis_info_file)
+
+    temp_folder_name = functions.slash_terminate(temp_folder_name)
+
+    cmdStr = ('/usr/bin/Rscript bin/analyseMethylationPatterns.r %s %s %s %s %s %s %s %s %s ' 
+        % (sample_group_file, cov_dir, ai['target_regions_bed'], temp_folder_name, ai['ncores'],  chunk_size, ai['gtf_file'], ai['dmr_bandwidth'], ai['sill']))
+
+    logger.info("Running methylation analysis")
+    functions.srun(cmdStr, ncores=ai['ncores'], mem=20)
+
+
+
+

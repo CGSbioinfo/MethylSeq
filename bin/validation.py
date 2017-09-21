@@ -48,6 +48,10 @@ def validateAnalysisInfo(analysis_info_file):
         ok = False
         print "Reference genome folder was not found: " + ai['reference_genome']
 
+    if not os.path.exists(ai['gtf_file']):
+        ok = False
+        print "Genome annotation file was not found: " + ai['gtf_file']
+
     # Check that the read type is a valid entry
     if not (ai['readType']=='pairedEnd' or ai['readType']=='singleEnd'):
         ok = False
@@ -79,6 +83,26 @@ def validateAnalysisInfo(analysis_info_file):
         ok = False
         print "The clean_files option must be either True or False: "+ clean
 
+    # Check that the bandwidth value is a valid number
+    try:
+        dmr_bandwidth = int(ai['dmr_bandwidth'])
+        if(dmr_bandwidth<=10 ):
+            ok = False
+            print "DMR bandwidth must be between greater than 10"
+    except Exception as e:
+        ok = False
+        print "DMR bandwidth is not a valid number: " + ai['dmr_bandwidth']
+
+
+    try:
+        sill = float(ai['sill'])
+        if(sill<0 or sill > 1):
+            ok = False
+            print "Sill value must be between 0 and 1"
+    except Exception as e:
+        ok = False
+        print "Sill value is not a valid number: " + ai['sill']
+
 
     # Output result to system
 
@@ -105,8 +129,7 @@ def validateAnalysisInfo(analysis_info_file):
     # ncores = 8
     # ninstances = 2
     # clean_files = False
-
-    # Note: currently, target_regions_bed is only called in calculateCoverage.py, which is not in the main pipeline
+    # sill = 1
 
 def checkExperimentName(name):
     '''Check the validity of the given experiment name.

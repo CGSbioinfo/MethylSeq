@@ -15,15 +15,15 @@ meta.env = new.env() # parameters for the analysis
 data.env = new.env() # data for the ongoing analysis
 func.env = new.env() # functions defined in this file
 
-meta.env$sample.info.file   = commandArgs(TRUE)[1]
-meta.env$sample.group.file  = commandArgs(TRUE)[2]
-meta.env$cov.file.folder    = commandArgs(TRUE)[3]
-meta.env$target.region.file = commandArgs(TRUE)[4] # Can be NA
-meta.env$temp.folder.name   = commandArgs(TRUE)[5]
-meta.env$ncores             = as.numeric(commandArgs(TRUE)[6])
-meta.env$chunk.size         = as.numeric(commandArgs(TRUE)[7])
-meta.env$gtf.file           = commandArgs(TRUE)[8]
-meta.env$dmr.bandwidth      = as.numeric(commandArgs(TRUE)[9])
+meta.env$sample.group.file  = commandArgs(TRUE)[1]
+meta.env$cov.file.folder    = commandArgs(TRUE)[2]
+meta.env$target.region.file = commandArgs(TRUE)[3] # Can be NA
+meta.env$temp.folder.name   = commandArgs(TRUE)[4]
+meta.env$ncores             = as.numeric(commandArgs(TRUE)[5])
+meta.env$chunk.size         = as.numeric(commandArgs(TRUE)[6])
+meta.env$gtf.file           = commandArgs(TRUE)[7]
+meta.env$dmr.bandwidth      = as.numeric(commandArgs(TRUE)[8])
+meta.env$sill               = as.numeric(commandArgs(TRUE)[9])
 
 #' This function loads the external functions file.
 #' @title Load external functions
@@ -46,8 +46,7 @@ loadFunctionsFile()
 #
 ##################
 
-# functions::checkPath() will quit if file not found
-pathExistsOrQuit(meta.env$sample.info.file, "Sample name file") 
+# functions::pathExistsOrQuit() will quit if file not found
 pathExistsOrQuit(meta.env$sample.group.file, "Sample group file") 
 pathExistsOrQuit(meta.env$cov.file.folder, "Coverage file folder")
 pathExistsOrQuit(meta.env$gtf.file, "Gene annotation file")
@@ -64,7 +63,7 @@ meta.env$temp.folder.name = ifelse(endsWith(meta.env$temp.folder.name, "/"),
   meta.env$temp.folder.name, 
   paste0(meta.env$temp.folder.name, "/"))
 
-meta.env$temp.image.path = paste0(dirname(meta.env$sample.info.file),"/", meta.env$temp.folder.name)
+meta.env$temp.image.path = paste0(dirname(meta.env$sample.group.file),"/", meta.env$temp.folder.name)
 if(!dir.exists(meta.env$temp.image.path)){
   dir.create(meta.env$temp.image.path)
 }
@@ -106,12 +105,6 @@ func.env$runOrSkip = function(nextStepTempFile, tempFile, runFunction){
 }
 
 func.env$readSamples = function(){
-  info( meta.env$log.file, "Reading sample names file...")
-
-  sampleInfo = read.table(meta.env$sample.info.file, sep="\t", header=F)
-  rownames(sampleInfo) = as.character(sampleInfo$V1)
-  colnames(sampleInfo) = c("Sample.Name")
-  assign( "sampleInfo", sampleInfo, envir=data.env)
 
   info( meta.env$log.file, "Reading sample groups file...")
 
@@ -371,16 +364,37 @@ func.env$runNullBetaRegression = function(){
 
   # Since there are only a small number of samples, use an even division.
   # The group null labels should cover the number of samples in your predictmeth object
-  # Do not use real group assignments. I.e. have an even split of case and control between
+  # Do not use real group assignments i.e. have an even split of case and control between
   # samples.
 
-  # Since there are 3 case and 3 control, we need to select 2 and 2.
-  # TODO - make dynamic based on group column
-  # Choose number of samples to take (minimum multiple of two)
+  # For example, if there are 3 case and 3 control, we need to select 2 and 2.
 
-  predictedMethNull = data.env$predictedMeth[,c(1, 3, 2, 5)]
+  # Choose maximum possible  number of samples to take (minimum multiple of two)
+  createNullSample = function(){
 
-  colData(predictedMethNull)$group.null=rep(c(1,2), nrow(colData(predictedMethNull))/2)
+    sample.groups  = sampleGroups %>% distinct(Group) %>% unlist()
+    sample.numbers = sampleGroups %>% group_by(Group) %>% mutate(Count = n()) %>% select(-Sample.Name) %>% distinct()
+    sample.count   = min(ceiling(sample.numbers$Count/2)) # Number of samples from each group to select 
+
+    getNullSamplesForGroup = function(i){
+      sampleGroups %>% filter(Group == sample.groups[i]) %>% head(sample.count) %>% select(Sample.Name) %>% unlist()
+    }
+
+    group1 = getNullSamplesForGroup(1)
+    group2 = getNullSamplesForGroup(2)
+
+    info( meta.env$log.file, paste0("Chosen samples for null test: " , paste(group1, group2, collapse=", ")))
+
+    nullSamples = data.env$predictedMeth[, c(group1,group2)]
+    # nullSamples = data.env$predictedMeth[,c(1, 3, 2, 5)]
+
+    colData(nullSamples)$group.null=rep(c(1,2), nrow(colData(nullSamples))/2)
+    print("Sample data:")
+    print(colData(nullSamples))
+    nullSamples
+  }
+
+  predictedMethNull = createNullSample()
 
   info( meta.env$log.file, "Selected samples for modelling")
 
@@ -410,7 +424,7 @@ func.env$runNullBetaRegression = function(){
   # At this point, you can invoke the parallelBetaRegression.r script on other node(s).
   # srun <options> /usr/bin/Rscript bin/parallelBetaRegression.r <temp.folder.name> <ncores> <is.null.regression>
   # Example:
-  # srun -w calculon -c 36 /usr/bin/Rscript bin/parallelBetaRegression.r tmpImages_30core_25k_chunk/ 30 T
+  # srun -w calculon -c 20 /usr/bin/Rscript bin/parallelBetaRegression.r tmpImages/ 20 T
 
   # Wait for all lock files to be removed - halts until other nodes finish processing
   locksRemoved = function(){
@@ -444,7 +458,8 @@ func.env$runNullBetaRegression = function(){
 #' @export
 func.env$quitForVar = function(){
     save(data.env, file = paste0(meta.env$temp.image.path, "Variogram.RData"))
-    info( meta.env$log.file, "Quitting so you can examine the variogram")  
+    info( meta.env$log.file, "Quitting so you can examine the variogram")
+    info( meta.env$log.file, "Adjust the sill value in the analysis info and rerun step 6")  
     quit(save="no", status=0)
 }
 
@@ -556,7 +571,7 @@ func.env$findOverlapsWithGTF = function(){
   }
 
   info( meta.env$log.file, "Plotting DMRs") 
-  outputDir = paste0(dirname(meta.env$sample.info.file),"/DMR_images/")
+  outputDir = paste0(dirname(meta.env$sample.group.file),"/DMR_images/")
   if(!dir.exists(outputDir)){
     dir.create(outputDir)
   }
