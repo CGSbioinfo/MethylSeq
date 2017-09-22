@@ -20,7 +20,7 @@ meta.env$cov.file.folder    = commandArgs(TRUE)[2]
 meta.env$target.region.file = commandArgs(TRUE)[3] # Can be NA
 meta.env$temp.folder.name   = commandArgs(TRUE)[4]
 meta.env$ncores             = as.numeric(commandArgs(TRUE)[5])
-meta.env$chunk.size         = as.numeric(commandArgs(TRUE)[6])
+meta.env$chunk.size         = as.numeric(commandArgs(TRUE)[6]) # number of rows per data chunk in beta regression
 meta.env$gtf.file           = commandArgs(TRUE)[7]
 meta.env$dmr.bandwidth      = as.numeric(commandArgs(TRUE)[8])
 meta.env$sill               = as.numeric(commandArgs(TRUE)[9])
@@ -59,9 +59,7 @@ if(!is.na(meta.env$target.region.file)){
   pathExistsOrQuit(meta.env$target.region.file, "Target region file")
 }
 
-meta.env$temp.folder.name = ifelse(endsWith(meta.env$temp.folder.name, "/"), 
-  meta.env$temp.folder.name, 
-  paste0(meta.env$temp.folder.name, "/"))
+meta.env$temp.folder.name = slashTerminate(meta.env$temp.folder.name)
 
 meta.env$temp.image.path = paste0(dirname(meta.env$sample.group.file),"/", meta.env$temp.folder.name)
 if(!dir.exists(meta.env$temp.image.path)){
@@ -104,6 +102,9 @@ func.env$runOrSkip = function(nextStepTempFile, tempFile, runFunction){
   }
 }
 
+#' Read the methylation sample files
+#' @title Read samples
+#' @export
 func.env$readSamples = function(){
 
   info( meta.env$log.file, "Reading sample groups file...")
@@ -124,6 +125,9 @@ func.env$readSamples = function(){
   assign( "methylDataRaw", methylDataRaw, envir=data.env)
 }
 
+#' Read the target region file and select these regions from methylation data
+#' @title Read target regions
+#' @export
 func.env$readTargetRegions = function(){
   # Read target region annotations
   info( meta.env$log.file, "Reading target regions")
@@ -160,6 +164,9 @@ func.env$readTargetRegions = function(){
   rm(methylDataRaw.filter10, envir=data.env) # no longer needed
 }
 
+#' Cluster CpGs and smooth the methylation
+#' @title Define clusters
+#' @export
 func.env$defineCpGClusters = function(){
   info( meta.env$log.file, "Defining Cpg clusters")
 
@@ -196,6 +203,11 @@ func.env$defineCpGClusters = function(){
   rm(methylDataRaw.filter10.rk, envir=data.env)  #no longer needed
 }
 
+#' Run beta regression on a data chunk
+#' @title Run regression on chunk
+#' @param chunk.name the name of the data chunk to process
+#' @param is.null T if this is the null model regression, F otherwise
+#' @export
 func.env$betaRegressionOnChunk = function(chunk.name, is.null){
 
     null.string = ifelse(is.null, ".null", "")
@@ -247,6 +259,9 @@ func.env$betaRegressionOnChunk = function(chunk.name, is.null){
     }
 }
 
+#' Run beta regression on the samples
+#' @title Run beta regression
+#' @export
 func.env$runBetaRegression = function(){
   
   info( meta.env$log.file, paste("Running beta regression across", meta.env$ncores, "instances...", sep=" "))
@@ -332,8 +347,15 @@ func.env$runBetaRegression = function(){
   betaResults.split   = lapply(chunk.names, loadResultsChunk )
   betaResults = do.call("rbind", betaResults.split)
   assign( "betaResults", betaResults, envir=data.env)
+
+  # Remove the chunk files
+  file.list = list.files(path=meta.env$temp.folder.name, pattern="Chunk\\d+.*.Rdata", full.names = T)
+  file.remove(file.list)
 }
 
+#' Create a null model and run the null regression on the samples
+#' @title Run null regression
+#' @export
 func.env$runNullBetaRegression = function(){
   info( meta.env$log.file, paste("Running resampled beta model regression for null hypothesis across", meta.env$ncores, "instances ...", sep=" "))
 
@@ -372,12 +394,21 @@ func.env$runNullBetaRegression = function(){
   # Choose maximum possible  number of samples to take (minimum multiple of two)
   createNullSample = function(){
 
-    sample.groups  = sampleGroups %>% distinct(Group) %>% unlist()
-    sample.numbers = sampleGroups %>% group_by(Group) %>% mutate(Count = n()) %>% select(-Sample.Name) %>% distinct()
-    sample.count   = min(ceiling(sample.numbers$Count/2)) # Number of samples from each group to select 
+    sample.groups  = data.env$sampleGroups %>% distinct(Group) %>% unlist()
+    info( meta.env$log.file, paste("Found", sample.groups, "samples groups", collapse = " | "))
+    # sample.distinct = data.env$sampleGroups
+    # sample.numbers = sample.distinct %>% dplyr::group_by(Group) %>% dplyr::mutate(Count = n()) %>% dplyr::distinct()
+    # print(sample.numbers)
 
+    sample.numbers = data.env$sampleGroups %>% group_by(Group) %>% summarise(n= n()) %>% select(n)
+    # print(sample.numbers)
+
+    # info( meta.env$log.file, paste("Found", sample.numbers, "samples in each group", collapse = " | "))
+    sample.count   = min(ceiling(sample.numbers/2)) # Number of samples from each group to select 
+
+    info( meta.env$log.file, paste("Choosing", sample.count, "samples from each group"))
     getNullSamplesForGroup = function(i){
-      sampleGroups %>% filter(Group == sample.groups[i]) %>% head(sample.count) %>% select(Sample.Name) %>% unlist()
+      data.env$sampleGroups %>% filter(Group == sample.groups[i]) %>% head(sample.count) %>% select(Sample.Name) %>% unlist()
     }
 
     group1 = getNullSamplesForGroup(1)
@@ -451,6 +482,10 @@ func.env$runNullBetaRegression = function(){
   png(file=paste0(meta.env$temp.image.path,"Null_variogram.png"),width = 480, height=480)
   plot(vario$variogram$v)
   dev.off()
+
+  # Remove the chunk files
+  file.list = list.files(path=meta.env$temp.folder.name, pattern="Chunk\\d+.*.Rdata", full.names = T)
+  file.remove(file.list)
 }
 
 #' Quit the script so the variogram can be examined.
@@ -463,7 +498,9 @@ func.env$quitForVar = function(){
     quit(save="no", status=0)
 }
 
-
+#' Smooth the variogram and identify DMRs
+#' @title Smooth variogram
+#' @export
 func.env$smoothValues = function(){
   
   sill_value= 0.30
@@ -529,8 +566,12 @@ func.env$smoothValues = function(){
   assign( "DMRs.df", DMRs.df, envir=data.env)
 }
 
+#' Find overlaps between the DMRs and genes, and export tables.
+#' @title Find genes overlapping DMRs
+#' @export
 func.env$findOverlapsWithGTF = function(){
   info( meta.env$log.file, "Finding DMR overlaps with genes") 
+  outputDir = paste0(dirname(meta.env$sample.group.file),"Report/figure/DMR_results/")
 
   merge_hits=function(x){
     data.frame(seqnames=x$seqnames[1], start=x$start[1], end=x$end[1], width=x$width[1],
@@ -557,7 +598,7 @@ func.env$findOverlapsWithGTF = function(){
   
   DMRs.annotated     = tempoverlap2 %>% group_by(seqnames2) %>% do(merge_hits(.)) %>% as.data.frame
  
-  write.table(file=paste0(meta.env$temp.image.path, "DMRs_annotated_genes.tsv"), sep="\t",row.names = F, DMRs.annotated)
+  write.table(file=paste0(outputDir, "DMRs_annotated_genes.tsv"), sep="\t",row.names = F, DMRs.annotated)
 
   if(!is.na(meta.env$target.region.file)){
     bed.kit = import.bed(meta.env$target.region.file)
@@ -567,11 +608,11 @@ func.env$findOverlapsWithGTF = function(){
     tempoverlap2.kit = data.frame(tempoverlap2.kit)
     tempoverlap2.kit$seqnames2 = paste0(tempoverlap2.kit$seqnames,'_', tempoverlap2.kit$start)
     DMRs.annotated.kit = tempoverlap2.kit %>% group_by(seqnames2) %>% do(merge_hits(.)) %>% as.data.frame
-    write.table(file=paste0(meta.env$temp.image.path, "DMRs_annotated_kit.tsv"),   sep="\t",row.names = F, DMRs.annotated.kit)
+    write.table(file=paste0(outputDir, "DMRs_annotated_kit.tsv"),   sep="\t",row.names = F, DMRs.annotated.kit)
   }
 
   info( meta.env$log.file, "Plotting DMRs") 
-  outputDir = paste0(dirname(meta.env$sample.group.file),"/DMR_images/")
+  
   if(!dir.exists(outputDir)){
     dir.create(outputDir)
   }
@@ -630,8 +671,8 @@ func.env$findOverlapsWithGTF = function(){
 func.env$func.order = c(func.env$readSamples, func.env$readTargetRegions, func.env$defineCpGClusters, func.env$runBetaRegression,
   func.env$runNullBetaRegression, func.env$quitForVar, func.env$smoothValues, func.env$findOverlapsWithGTF)
 # The corresponding save points
-func.env$func.names = c("Read_files.RData", "Filtered_methylation.RData", "Predicted_methylation.RData", "Beta_regression.RData",
-  "Beta_regression_null.RData", "Variogram.RData", "DMRs_found.RData", "Overlaps_with_GTF.RData", "end.RData")
+func.env$func.names = c("Save_1.RData", "Save_2.RData", "Save_3.RData", "Save_4.RData",
+  "Save_5.RData", "Save_6.RData", "Save_7.RData", "Save_8.RData", "Save_9_end.RData")
 
 for( i in 1:length(func.env$func.order)){
   thisFile = func.env$func.names[i]

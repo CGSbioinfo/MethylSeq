@@ -38,7 +38,6 @@ loadFunctionsFile()
 ##################
 
 pathExistsOrQuit(in_dir, "Sample input folder")
-pathExistsOrQuit(sample.name, "Sample names file")
 pathExistsOrQuit(outdir, "Output directory")
 
 ##################

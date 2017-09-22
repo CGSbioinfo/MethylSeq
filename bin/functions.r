@@ -102,3 +102,11 @@ info = function(file, msg){
 warn = function(file, msg){
     logToFile(file, paste("WARN", msg, sep="\t"))
 }
+
+#' Ensure a string ends with /
+#' @param s the string
+#' @return the string ending with /
+#' @export
+slashTerminate = function(s){
+    ifelse(endsWith(s, "/"), s, paste0(s, "/"))
+}

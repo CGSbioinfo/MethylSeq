@@ -33,7 +33,6 @@ meta.env$server = system("hostname", intern = TRUE)
 
 meta.env$log.file = paste0(meta.env$temp.image.folder, "log.txt")
 info( meta.env$log.file, paste("Running parallel on", meta.env$server))
-# cat("Running parallel on", meta.env$server, "\n", file=meta.env$log.file, append=TRUE)
 
 ##################
 #
@@ -59,15 +58,13 @@ betaRegressionOnChromosome = function(chunk.name){
 
       saveRDS(result, file = resultsFile)
       time = printTimeTaken(proc.time() - ptm)
-      cat(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, "\n", 
-        file=meta.env$log.file, append=TRUE, sep = "\t")
+      info( meta.env$log.file, paste(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, sep="\t"))
       return()
     }
 
     loadChromosomeChunk = function(inputFile) {
       # Load the saved data chunk with the given name and run regression
       info( meta.env$log.file, paste("Loading data chunk", chunk.name))
-      # cat("Loading data chunk", chunk.name, "\n")
       return(readRDS(inputFile))
     }
 
@@ -91,7 +88,6 @@ betaNullRegressionOnChromosome = function(chunk.name){
 
     runRegression = function(obj){
       info( meta.env$log.file, paste("Chunk", chunk.name, "with", nrow(obj), "rows"))
-      # cat("Chunk", chunk.name, "with", nrow(obj), "rows\n")
       ptm = proc.time()
       result = betaRegression(formula=~group.null, 
                       link='probit', 
@@ -101,14 +97,13 @@ betaNullRegressionOnChromosome = function(chunk.name){
 
       saveRDS(result, file = resultsFile)
       time = printTimeTaken(proc.time() - ptm)
-      cat(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, "\n", file=meta.env$log.file, append=TRUE, sep = "\t")
+      info( meta.env$log.file, paste(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, sep="\t"))
       return()
     }
 
     loadChromosomeChunk = function(inputFile) {
       # Load the saved data chunk with the given name and run regression
       info( meta.env$log.file, paste("Loading data chunk", chunk.name))
-      # cat("Loading data chunk", chunk.name, "\n")
       return(readRDS(inputFile))
     }
 
@@ -130,13 +125,10 @@ chunk.names = c(1:length(file.list))
 
 if(meta.env$isnull){
   info( meta.env$log.file, paste("Running parallel null beta regression across", meta.env$ncores, "instances..."))
-  # cat("Running parallel null beta regression across", meta.env$ncores, "instances ...\n")
   invisible(lapply(chunk.names, betaNullRegressionOnChromosome ))
 
 } else {
   info( meta.env$log.file, paste("Running parallel beta regression across", meta.env$ncores, "instances..."))
-  # info( meta.env$log.file, paste("Loading data chunk", chunk.name))
-  # cat("Running parallel beta regression across", meta.env$ncores, "instances ...\n")
   invisible(lapply(chunk.names, betaRegressionOnChromosome ))
 }
 

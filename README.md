@@ -76,15 +76,15 @@ Run the setup to create an info file that contains parameters for the subsequent
 $ python bin/runMethylationAnalysis.py --run step0_create_info
 ```
 A file named ```analysis_info.txt``` will be created in the folder. Open it in a text editor or vi and fill it. For example: 
->Working directory = /mnt/cgs-fs2/Bioinfo_pipeline/MethylSeq/test/aug2016/heroG/   
+>working_directory = /mnt/cgs-fs2/Bioinfo_pipeline/MethylSeq/test/aug2016/heroG/   
 >run_folder = /mnt/cgs-fs3/Sequencing/NextSeq_Output/160711_NS500125_0298_AHFW35BGXY/  
 >run_samplesheet = /mnt/cgs-fs3/Sequencing/NextSeq_Output/160711_NS500125_0298_AHFW35BGXY/SampleSheet.csv  
 >bcl2fastq_output = /mnt/cgs-fs2/Bioinfo_pipeline/MethylSeq/test/aug2016/heroG/fastq/  
 >readType = pairedEnd  
->reference_genome =  /mnt/cgs-fs3/Sequencing/Genome/Sscrofa11.1/
+>reference_genome =  /mnt/cgs-fs3/Sequencing/Genome/Sscrofa11.1/  
 >bismark_params = --bowtie2; --bam; --directional; -N 0; -L 20; --no-mixed; --no-discordant; -D 15; -R 2; --score_min L,0,-0.2;  
 >methyl_extract_params= --bedGraph; --gzip; --merge_non_CpG;  
->target_regions_bed =  /mnt/research/bms41/methylSeq/SureSelect/Sscrofa11.1.target.bed
+>target_regions_bed =  /mnt/research/bms41/methylSeq/SureSelect/Sscrofa11.1.target.bed  
 >ncores = 8  
 >ninstances = 3  
 >clean_files = False  
@@ -94,7 +94,7 @@ A file named ```analysis_info.txt``` will be created in the folder. Open it in a
 
 Field | Description | Values
 ------|------|------
-Working directory | path to directory of the analysis | 
+working_directory | path to directory of the analysis | 
 run_folder | path to the run folder |
 run_samplesheet | Sample sheet used to generate fastq files. This is created using the Illumina Experiment Manager |
 bcl2fastq_output | path to the desired output for bcl2fastq. The default is fastq/ and the folder will be created automatically | 
@@ -117,7 +117,7 @@ Using the command ```--run step1_prepare_analysis```, the main script will read 
 ```bash
 $ python bin/runMethylationAnalysis.py --run step1_prepare_analysis
 ```
-Once it finishes, there will be a folder named rawReads with fastq files sorted according to sample names. There will also be a sample_names.txt file with a list of sample names, one per line.  
+Once it finishes, there will be a folder ```rawReads/``` with fastq files sorted according to sample names. There will also be a ```sample_names.txt``` file with a list of sample names, one per line.  
   
   
 ### Step 2 
@@ -131,13 +131,13 @@ $ python bin/runMethylationAnalysis.py --run step2_qc_and_trimming
 ### Step 3
 Using the command ```--run step3_mapping_and_deduplication```, the main script will read the analysis_info_file, the sample_names file and run bismark and deduplication scripts. The output includes bam file (original and deduplicated), and log files of each sample, and will be saved in a folder ```alignedReads/``` (created automatically).
 ```bash
-$ python bin/runMethylationAnalysis.py --run step3_mapping_and_deduplication.
+$ python bin/runMethylationAnalysis.py --run step3_mapping_and_deduplication
 ```
 
 ### Step 4
 After checking the QC metrics in ```Report/figure/mappingQC/```, extract the methylation data using the command ```--run step4_extract_methylation```.
 ```bash
-$ python bin/runMethylationAnalysis.py --run step4_extract_methylation.
+$ python bin/runMethylationAnalysis.py --run step4_extract_methylation
 ```
 
 This creates 3 output files per sample: ```bedGraph.gz```, ```bismark.cov.gz```, and ```M-bias.txt```.   
@@ -159,7 +159,7 @@ Example:
 sample  | 5R1 | 3R1 | 5R2 | 3R2
 ------|-----|-----|-----|-----
 CQ_4557_cortex_aggr_S2 | 9 | 6 | 10 | 7  
-CQ_365_cortex_non-aggr_S6 |  |   9   |   6   |  10  |  7
+CQ_365_cortex_non-aggr_S6 |  9   |   6   |  10  |  7
 CQ_5221_cortex_aggr_S3  |  9  |   6  |   10 |   7
 CQ_2169_cortex_aggr_S1  |  9  |   6  |   10 |   7
 CQ_1299_cortex_non-aggr_S5 |   9  |   6   |  10  |  7
@@ -169,7 +169,7 @@ CQ_1313_cortex_non-aggr_S4  |  9  |   6   |  10  |  7
 Run the methyl extraction again. This will remove biased bases from reads using the information in  ```mbias_remove_bases.txt```.    
 
 ```bash
-$ python bin/runMethylationAnalysis.py --run step5_extract_methylation.
+$ python bin/runMethylationAnalysis.py --run step5_extract_methylation
 ```
 The results will be output to ```Report/figure/methExtractQC/Mbias_plot_clipped.pdf```
 Confirm that the clipping of bases worked.
@@ -178,20 +178,28 @@ The sequences coverage in the targeted regions and the whole genome will be outp
 
 ### Step 6 - Optional
 
-Run differential methylation analysis using BiSeq.
+Run differential methylation analysis using BiSeq. Familiarity with BiSeq analysis is expected.
 
 ```bash
-$ python bin/runMethylationAnalysis.py --run step6_analyse_methylation.
+$ python bin/runMethylationAnalysis.py --run step6_analyse_methylation
 ```
 
-Logging for the differential analysis is output to console and to the file ```tmpImages/log.txt```.
-During the beta regression step, the script will permit multi-node parallelisation using a secondary R script:
+Logging for the differential analysis is output to console and to the file ```biseqAnalysis/log.txt```.
 
-> /usr/bin/Rscript bin/parallelBetaRegression.r *\<temp_folder*\> *\<ncores*\> *\<is_null_regression*\>
+The BiSeq analysis is quite long, so progress is saved as ```.Rdata``` files at various points. If the main script is cancelled at any step, it will detect the last save point when invoked again and resume from there.
+
+There are instances where further action is needed within the script.
+
+#### 1) Beta regression
+
+The beta regression step is time-consuming, and so the script has been designed to allow greater parallelisation
+than if desired. Once the regression has begun the script will report ```Parallel script can now be invoked```.
+
+At this point multi-node parallelisation can be started using a secondary R script, ```parallelBetaRegression.R```. The main script saves out chunks of data that can be worked on independently. The parallel script works through any unfinished data chunks.
 
 Field | Description | Values
 ------|------|------
-temp_folder | the temporary folder for the regression | Use ```tmpImages/``` unless you known why you should change this
+temp_folder | the temporary folder for the regression | Use ```biseqAnalysis/``` unless you known why you should change this
 ncores | number of cores to use in this invokation | Integer >=1
 is_null_regression | is this is the null regression step | ```T``` if this is the null regression step, or ```F``` if this is the first beta regression
 
@@ -202,15 +210,15 @@ Example:
 
 ```
 
-The main script will wait until all parallel instances have completed.
+Multiple invokations of the parallel script can be made; the main script will wait until all parallel instances have completed.
 
-Following variogram generation, the main script will exit to allow a sill value to be chosen. Enter the desired sill in the analysis info file and rerun analysis step 6. The analysis will resume at the correct stage using saved data:
+#### 2) Setting the sill value for variogram smoothing
+
+Following variogram generation, the main script will exit to allow a sill value to be chosen. The variogram is saved to ```biseqAnalysis/Null_variogram.png```. Enter the desired sill in the analysis info file and rerun analysis step 6. The analysis will resume at the correct stage.
 
 ```bash
-$ python bin/runMethylationAnalysis.py --run step6_analyse_methylation.
+$ python bin/runMethylationAnalysis.py --run step6_analyse_methylation
 ```
 
-If the main script is cancelled at any step, it will resume from the last save point when invoked again.
-
-Detected DMRs will be exported to ```DMR_images/```.
+The detected DMRs will be exported to ```Report/figure/DMR_results/```. Tables with DMRs and DMRs overlapping genes are exported to ```Report/figure/DMR_results/DMRs_annotated_kit.tsv``` and ```Report/figure/DMR_results/DMRs_annotated_genes.tsv``` respectively.
 

@@ -55,7 +55,7 @@ getScores = function(sample){
   colnames(x) = c('x','y')
   x$Sample = sample
   # mr1 = rbind(mr1,x)
-
+  x
 }
 
 score.list = lapply(sample.names, getScores)
@@ -76,7 +76,7 @@ mr1 = do.call("rbind", score.list)
 #' @title Create a paired end read quality plot
 #' @return a \code{\link{ggplot}} object
 #' @export
-makePairedEndPlot = function(){
+makePairedEndPlot = function(mr1){
   mr2=matrix(ncol=3)
   colnames(mr2)=c('x','y','Sample')
   
@@ -88,7 +88,7 @@ makePairedEndPlot = function(){
     y$Sample=sample.names[i]
     mr2=rbind(mr2,y)
   }
-  mr2=mr2[-1,]
+  # mr2=mr2[-1,]
   mr2=cbind(mr2,Read='Read 2')
   
   d=rbind(mr1,mr2) 
@@ -98,7 +98,8 @@ makePairedEndPlot = function(){
     facet_wrap(~Read) +
     theme( axis.title.x =element_text(size=9), axis.title.y =element_text(size=6), 
            axis.text.x=element_text(size=8), axis.text.y=element_text(size=7), legend.text=element_text(size=8),  
-           legend.key.height=unit(.8,"line"), axis.title.y=element_blank()) + 
+           legend.key.height=unit(.8,"line") ) + 
+    # axis.title.y=element_blank()
     ylab("") + 
     xlab('Mean Quality score') + 
     scale_shape_manual(values=1:length(unique(d$Sample))) 
@@ -106,11 +107,11 @@ makePairedEndPlot = function(){
 
 
 
-mr1=mr1[-1,]
+# mr1=mr1[-1,]
 mr1=cbind(mr1,Read='Read 1')
 
 if (readType=='pairedEnd') {
-  p = makePairedEndPlot()
+  p = makePairedEndPlot(mr1)
   # mr2=matrix(ncol=3)
   # colnames(mr2)=c('x','y','Sample')
   # for (i in 1:length(sample.names)){

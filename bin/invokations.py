@@ -365,6 +365,9 @@ def extract_methylation(analysis_info_file='analysis_info.txt',
     dedup=False,
     cx=False,
     remove_bases_file='remove_bases.txt'):
+    '''
+    Run the bismark methylation extraction
+    '''
 
     logger = logging.getLogger("runMethylationAnalysis.invokations")
     ai=functions.read_analysis_info_file(analysis_info_file)
@@ -402,6 +405,9 @@ def extract_methylation(analysis_info_file='analysis_info.txt',
 
 def calculate_coverage(analysis_info_file='analysis_info.txt',
     cov_dir='alignedReads/'):
+    '''
+    Calculate the sequence coverage of the genome and target region
+    '''
 
     logger = logging.getLogger("runMethylationAnalysis.invokations")
     ai=functions.read_analysis_info_file(analysis_info_file)
@@ -420,8 +426,11 @@ def calculate_coverage(analysis_info_file='analysis_info.txt',
 def analyse_methylation(analysis_info_file='analysis_info.txt',
     cov_dir='alignedReads/', 
     sample_group_file='sample_groups.txt',
-    temp_folder_name='tmpImages/',
+    temp_folder_name='biseqAnalysis/',
     chunk_size=20000):
+    '''
+    Run differential methylation analysis in BiSeq.
+    '''
 
     logger = logging.getLogger("runMethylationAnalysis.invokations")
     ai=functions.read_analysis_info_file(analysis_info_file)
