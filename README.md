@@ -14,8 +14,11 @@ R packages:
 - reshape
 - grid
 - xtable
-  
-  
+- dplyr
+- purrr
+- BiSeq (optional)
+- parallel
+
 ---- 
 ## Before running the pipeline
 
@@ -166,7 +169,7 @@ CQ_1299_cortex_non-aggr_S5 |   9  |   6   |  10  |  7
 CQ_1313_cortex_non-aggr_S4  |  9  |   6   |  10  |  7
 
 ### Step 5
-Run the methyl extraction again. This will remove biased bases from reads using the information in  ```mbias_remove_bases.txt```.    
+Run the methyl extraction again. This will remove biased bases from reads using the information in  ```remove_bases.txt```.    
 
 ```bash
 $ python bin/runMethylationAnalysis.py --run step5_extract_methylation
@@ -192,10 +195,9 @@ There are instances where further action is needed within the script.
 
 #### 1) Beta regression
 
-The beta regression step is time-consuming, and so the script has been designed to allow greater parallelisation
-than if desired. Once the regression has begun the script will report ```Parallel script can now be invoked```.
+The beta regression step is time-consuming, and so the script has been designed to allow greater parallelisation if desired. Once the regression has begun the script will report ```Parallel script can now be invoked```.
 
-At this point multi-node parallelisation can be started using a secondary R script, ```parallelBetaRegression.R```. The main script saves out chunks of data that can be worked on independently. The parallel script works through any unfinished data chunks.
+At this point multi-node parallelisation can be started using a secondary R script, ```parallelBetaRegression.R```. The main script saves out chunks of data that can be worked on independently; the parallel script works through any unfinished data chunks.
 
 Field | Description | Values
 ------|------|------
@@ -206,7 +208,7 @@ is_null_regression | is this is the null regression step | ```T``` if this is th
 Example:
 
 ```bash
- $ srun -c 20 --mem=20G /usr/bin/Rscript bin/parallelBetaRegression.r tmpImages 20 F
+ $ srun -c 20 --mem=20G /usr/bin/Rscript bin/parallelBetaRegression.r biseqAnalysis 20 F
 
 ```
 
@@ -214,11 +216,11 @@ Multiple invokations of the parallel script can be made; the main script will wa
 
 #### 2) Setting the sill value for variogram smoothing
 
-Following variogram generation, the main script will exit to allow a sill value to be chosen. The variogram is saved to ```biseqAnalysis/Null_variogram.png```. Enter the desired sill in the analysis info file and rerun analysis step 6. The analysis will resume at the correct stage.
+Following variogram generation, the main script will exit to allow a sill value to be chosen. The variogram is saved to ```biseqAnalysis/Null_variogram.png```. Enter the desired sill in the analysis info file and rerun analysis step 6. The analysis will resume at the correct stage, and the smoothed variogram will be saved to ```biseqAnalysis/Smooth_variogram.png```
 
 ```bash
 $ python bin/runMethylationAnalysis.py --run step6_analyse_methylation
 ```
 
-The detected DMRs will be exported to ```Report/figure/DMR_results/```. Tables with DMRs and DMRs overlapping genes are exported to ```Report/figure/DMR_results/DMRs_annotated_kit.tsv``` and ```Report/figure/DMR_results/DMRs_annotated_genes.tsv``` respectively.
+The detected DMRs will be exported to ```Report/figure/DMR_results/```. Tables with DMRs and DMRs overlapping genes are exported to ```Report/figure/DMR_results/DMRs_overlapping_target_regions.tsv``` and ```Report/figure/DMR_results/DMRs_overlapping_annotated_genes.tsv``` respectively.
 

@@ -34,6 +34,9 @@ meta.env$server = system("hostname", intern = TRUE)
 meta.env$log.file = paste0(meta.env$temp.image.folder, "log.txt")
 info( meta.env$log.file, paste("Running parallel on", meta.env$server))
 
+meta.env$temp.image.folder = slashTerminate(meta.env$temp.image.folder)
+pathExistsOrQuit(meta.env$temp.image.folder, "Temp analysis folder")
+
 ##################
 #
 # Run

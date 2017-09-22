@@ -7,6 +7,7 @@ suppressMessages(library(BiSeq))
 suppressMessages(library(GenomicRanges))
 suppressMessages(library(rtracklayer))
 suppressMessages(library(dplyr))
+suppressMessages(library(purrr))
 suppressMessages(library(ggplot2))
 suppressMessages(library(reshape))
 suppressMessages(library(parallel))
@@ -380,30 +381,18 @@ func.env$runNullBetaRegression = function(){
   loadResultsChunk = function(chunk.name) {
     # Load the saved data chunk with the given name and run regression
     tempFile = paste0(meta.env$temp.image.path, "Chunk", chunk.name, ".null.beta.Rdata")
-    info( meta.env$log.file, paste("Loading data chunk for chunk", chunk.name, sep=" "))
+    info( meta.env$log.file, paste("Loading data chunk", chunk.name, sep=" "))
     return(readRDS(tempFile))
   }
-
-  # Since there are only a small number of samples, use an even division.
-  # The group null labels should cover the number of samples in your predictmeth object
-  # Do not use real group assignments i.e. have an even split of case and control between
-  # samples.
-
-  # For example, if there are 3 case and 3 control, we need to select 2 and 2.
-
-  # Choose maximum possible  number of samples to take (minimum multiple of two)
+  
+  #' Choose the samples for null modelling. There must be an even distribution
+  #' of samples into each null group. For example, if there are 3 case and 3 control, 
+  #' select 2 of each.
+  #' @title Choose null samples
   createNullSample = function(){
 
     sample.groups  = data.env$sampleGroups %>% distinct(Group) %>% unlist()
-    info( meta.env$log.file, paste("Found", sample.groups, "samples groups", collapse = " | "))
-    # sample.distinct = data.env$sampleGroups
-    # sample.numbers = sample.distinct %>% dplyr::group_by(Group) %>% dplyr::mutate(Count = n()) %>% dplyr::distinct()
-    # print(sample.numbers)
-
     sample.numbers = data.env$sampleGroups %>% group_by(Group) %>% summarise(n= n()) %>% select(n)
-    # print(sample.numbers)
-
-    # info( meta.env$log.file, paste("Found", sample.numbers, "samples in each group", collapse = " | "))
     sample.count   = min(ceiling(sample.numbers/2)) # Number of samples from each group to select 
 
     info( meta.env$log.file, paste("Choosing", sample.count, "samples from each group"))
@@ -414,20 +403,25 @@ func.env$runNullBetaRegression = function(){
     group1 = getNullSamplesForGroup(1)
     group2 = getNullSamplesForGroup(2)
 
-    info( meta.env$log.file, paste0("Chosen samples for null test: " , paste(group1, group2, collapse=", ")))
-
     nullSamples = data.env$predictedMeth[, c(group1,group2)]
-    # nullSamples = data.env$predictedMeth[,c(1, 3, 2, 5)]
 
     colData(nullSamples)$group.null=rep(c(1,2), nrow(colData(nullSamples))/2)
-    print("Sample data:")
-    print(colData(nullSamples))
+
+    columns = as.data.frame(colData(nullSamples)[, c("Sample.Name", "Group", "group.null")])
+    printNullGroup = function(i){
+        null = columns %>% filter(group.null == i) %>% select(Sample.Name) %>% unlist()
+        info( meta.env$log.file, paste0("Chosen samples for null group ", i, ": ", paste(null, collapse=", ")))
+    }
+
+    printNullGroup(1)
+    printNullGroup(2)
+
     nullSamples
   }
 
   predictedMethNull = createNullSample()
 
-  info( meta.env$log.file, "Selected samples for modelling")
+  info( meta.env$log.file, "Selected samples for null modelling")
 
   nchunks     = ceiling(length(predictedMethNull)/meta.env$chunk.size)
   chunk.names = c(1:nchunks)
@@ -473,6 +467,7 @@ func.env$runNullBetaRegression = function(){
   betaResultsNull = do.call("rbind", betaResultsNull.split)
   assign( "betaResultsNull", betaResultsNull, envir=data.env)
 
+  info( meta.env$log.file, "Creating variogram...")  
   # Estimate the variogram for the Z scores obtained for the resampled data
   vario = makeVariogram(betaResultsNull)
 
@@ -492,7 +487,7 @@ func.env$runNullBetaRegression = function(){
 #' @title Save and quit 
 #' @export
 func.env$quitForVar = function(){
-    save(data.env, file = paste0(meta.env$temp.image.path, "Variogram.RData"))
+    save(data.env, file = paste0(meta.env$temp.image.path, "Save_6.Rdata"))
     info( meta.env$log.file, "Quitting so you can examine the variogram")
     info( meta.env$log.file, "Adjust the sill value in the analysis info and rerun step 6")  
     quit(save="no", status=0)
@@ -571,7 +566,11 @@ func.env$smoothValues = function(){
 #' @export
 func.env$findOverlapsWithGTF = function(){
   info( meta.env$log.file, "Finding DMR overlaps with genes") 
-  outputDir = paste0(dirname(meta.env$sample.group.file),"Report/figure/DMR_results/")
+  outputDir = paste0(dirname(meta.env$sample.group.file),"/Report/figure/DMR_results/")
+  if(!dir.exists(outputDir)){
+    info( meta.env$log.file, paste("Creating output directory", outputDir ))
+    dir.create(outputDir)
+  }
 
   merge_hits=function(x){
     data.frame(seqnames=x$seqnames[1], start=x$start[1], end=x$end[1], width=x$width[1],
@@ -598,7 +597,7 @@ func.env$findOverlapsWithGTF = function(){
   
   DMRs.annotated     = tempoverlap2 %>% group_by(seqnames2) %>% do(merge_hits(.)) %>% as.data.frame
  
-  write.table(file=paste0(outputDir, "DMRs_annotated_genes.tsv"), sep="\t",row.names = F, DMRs.annotated)
+  write.table(file=paste0(outputDir, "DMRs_overlapping_annotated_genes.tsv"), sep="\t",row.names = F, DMRs.annotated)
 
   if(!is.na(meta.env$target.region.file)){
     bed.kit = import.bed(meta.env$target.region.file)
@@ -608,7 +607,7 @@ func.env$findOverlapsWithGTF = function(){
     tempoverlap2.kit = data.frame(tempoverlap2.kit)
     tempoverlap2.kit$seqnames2 = paste0(tempoverlap2.kit$seqnames,'_', tempoverlap2.kit$start)
     DMRs.annotated.kit = tempoverlap2.kit %>% group_by(seqnames2) %>% do(merge_hits(.)) %>% as.data.frame
-    write.table(file=paste0(outputDir, "DMRs_annotated_kit.tsv"),   sep="\t",row.names = F, DMRs.annotated.kit)
+    write.table(file=paste0(outputDir, "DMRs_overlapping_target_regions.tsv"),   sep="\t",row.names = F, DMRs.annotated.kit)
   }
 
   info( meta.env$log.file, "Plotting DMRs") 
@@ -680,3 +679,5 @@ for( i in 1:length(func.env$func.order)){
   thisFunc = func.env$func.order[[i]]
   func.env$runOrSkip(nextFile, thisFile, thisFunc)
 }
+
+info( meta.env$log.file, "BiSeq analysis complete") 
