@@ -14,21 +14,19 @@ out_wholeGenome          =commandArgs(TRUE)[3]
 out_targetRegion         =commandArgs(TRUE)[4]
 annotation_target_regions=commandArgs(TRUE)[5]
 
-##################
-#
-# Load external 
-# functions
-#
-##################
+#' This function loads the external functions file.
+#' @title Load external functions
+#' @export
+loadFunctionsFile = function(){
+  cat("Loading functions ...\n")
+  file.arg.name = "--file="
+  script.name   = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
+  script.folder = dirname(script.name)
+  script.to.load = paste(sep="/", script.folder, "functions.r")
+  source(script.to.load)
+}
 
-cat("Loading functions ...\n")
-
-file.arg.name   = "--file="
-script.name     = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
-script.basename = dirname(script.name)
-other.name      = paste(sep="/", script.basename, "functions.r")
-
-source(other.name)
+loadFunctionsFile()
 
 ##################
 #
@@ -38,12 +36,12 @@ source(other.name)
 ##################
 
 # functions::checkPath() will quit if file not found
-checkPath(sampleInfoFile, "Sample name file") 
-checkPath(bedGraphFolder, "BedGraph folder")
-checkPath(annotation_target_regions, "Genome annotation")
+pathExistsOrQuit(sampleInfoFile, "Sample name file") 
+pathExistsOrQuit(bedGraphFolder, "BedGraph folder")
+pathExistsOrQuit(annotation_target_regions, "Genome annotation")
 
-checkPath(dirname(out_wholeGenome), "Whole genome output folder")
-checkPath(dirname(out_targetRegion), "Target region output folder")
+pathExistsOrQuit(dirname(out_wholeGenome), "Whole genome output folder")
+pathExistsOrQuit(dirname(out_targetRegion), "Target region output folder")
 
 ##################
 #

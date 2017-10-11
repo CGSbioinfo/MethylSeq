@@ -94,6 +94,7 @@ A file named ```analysis_info.txt``` will be created in the folder. Open it in a
 >sill = 1  
 >dmr_bandwidth = 50  
 >gtf_file = /mnt/cgs-fs3/Sequencing/Genome/Sscrofa11.1/annotation/Sus_scrofa.Sscrofa11.1.90.gtf  
+>extract_cx = False  
 
 Field | Description | Values
 ------|------|------
@@ -112,6 +113,7 @@ clean_files | Should files be cleaned | ```True``` or ```False```
 sill | The sill value when smoothing variograms |  0-1
 dmr_bandwidth | The DMR smoothing width | Integer >=10
 gtf_file | The gene annotations for the reference genome in GTF format | 
+extract_cx | Should methylation calls be extracted in CX context | ```True``` or ```False```  
 
   
 ### Step 1
