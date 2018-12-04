@@ -3,6 +3,7 @@
 # https://www.bioconductor.org/packages/devel/bioc/vignettes/BiSeq/inst/doc/BiSeq.pdf
 
 cat("Loading R packages ...\n")
+
 suppressMessages(library(BiSeq))
 suppressMessages(library(GenomicRanges))
 suppressMessages(library(rtracklayer))
@@ -13,7 +14,7 @@ suppressMessages(library(reshape))
 suppressMessages(library(parallel))
 
 meta.env = new.env() # parameters for the analysis
-data.env = new.env() # data for the ongoing analysis
+data.env = new.env() # data for the ongoing analysis - serialisable
 func.env = new.env() # functions defined in this file
 
 meta.env$sample.group.file  = commandArgs(TRUE)[1]
@@ -25,13 +26,17 @@ meta.env$chunk.size         = as.numeric(commandArgs(TRUE)[6]) # number of rows 
 meta.env$gtf.file           = commandArgs(TRUE)[7]
 meta.env$dmr.bandwidth      = as.numeric(commandArgs(TRUE)[8])
 meta.env$sill               = as.numeric(commandArgs(TRUE)[9])
+meta.env$tissue             = commandArgs(TRUE)[10] # choose the tissue to subset by
 
-#' This function loads the external functions file.
+#' This function loads the external functions source file.
+#' Detects the directory containing this script, and loads the function
+#' file from the same directory. Allows this script to be invoked from a
+#' different working directory without hardcoding paths.
 #' @title Load external functions
 #' @export
 loadFunctionsFile = function(){
   cat("Loading functions ...\n")
-  file.arg.name = "--file="
+  file.arg.name = "--file=" # implicit argument when RScript is invoked
   script.name   = sub(file.arg.name, "", commandArgs()[grep(file.arg.name, commandArgs())])
   script.folder = dirname(script.name)
   script.to.load = paste(sep="/", script.folder, "functions.r")
@@ -47,30 +52,31 @@ loadFunctionsFile()
 #
 ##################
 
-# functions::pathExistsOrQuit() will quit if file not found
-pathExistsOrQuit(meta.env$sample.group.file, "Sample group file") 
-pathExistsOrQuit(meta.env$cov.file.folder, "Coverage file folder")
-pathExistsOrQuit(meta.env$gtf.file, "Gene annotation file")
+quit.if.not.exists(meta.env$sample.group.file, "Sample group file") 
+quit.if.not.exists(meta.env$cov.file.folder, "Coverage file folder")
+quit.if.not.exists(meta.env$gtf.file, "Gene annotation file")
 
 if(meta.env$target.region.file=='NA'){
   meta.env$target.region.file=NA
 }
 
 if(!is.na(meta.env$target.region.file)){
-  pathExistsOrQuit(meta.env$target.region.file, "Target region file")
+  quit.if.not.exists(meta.env$target.region.file, "Target region file")
 }
 
 meta.env$temp.folder.name = slashTerminate(meta.env$temp.folder.name)
 
 meta.env$temp.image.path = paste0(dirname(meta.env$sample.group.file),"/", meta.env$temp.folder.name)
-if(!dir.exists(meta.env$temp.image.path)){
-  dir.create(meta.env$temp.image.path)
-}
+ensure.dir.exists(meta.env$temp.image.path)
 
 meta.env$server = system("hostname", intern = TRUE)
 
-meta.env$log.file = paste0(meta.env$temp.image.path, "log.txt")
-info( meta.env$log.file, paste0("Running main on ", meta.env$server))
+meta.env$log.file = paste0(meta.env$temp.image.path, format.Date(Sys.time(), "%Y-%m-%d_%H-%M-%S"), ".log.txt")
+debug( meta.env$log.file, paste0("Running main on ", meta.env$server))
+debug( meta.env$log.file, paste0("Platform: ", sessionInfo()$running ))
+debug( meta.env$log.file, paste0("R version: ", getRversion()))
+log.pkgs = function(pkg) debug( meta.env$log.file, paste0(pkg$Package, " - ", pkg$Version))
+invisible(lapply(sessionInfo()$otherPkgs, log.pkgs))
 
 ##################
 #
@@ -108,22 +114,34 @@ func.env$runOrSkip = function(nextStepTempFile, tempFile, runFunction){
 #' @export
 func.env$readSamples = function(){
 
-  info( meta.env$log.file, "Reading sample groups file...")
+  info( meta.env$log.file, paste0("Reading sample groups file '", meta.env$sample.group.file,"'..."))
 
-  sampleGroups = read.table(meta.env$sample.group.file, sep="\t", header=T)
+  sampleGroups = read.csv(meta.env$sample.group.file, sep="\t", header=T, stringsAsFactors=F) %>%
+    dplyr::filter(Tissue == meta.env$tissue) %>% dplyr::filter(Type == "Old")
   rownames(sampleGroups) = as.character(sampleGroups$Sample.Name)
   assign( "sampleGroups", sampleGroups, envir=data.env)
+  info( meta.env$log.file, paste0("Found ", nrow(sampleGroups), " samples for ", meta.env$tissue))
 
   # Locate coverage files
   info( meta.env$log.file, "Locating cov files...")
 
   cov.file.list = list.files(path=meta.env$cov.file.folder,pattern=".cov",full.names = T)
-  cov.file.list = grep(paste0(c(as.character(sampleGroups$Sample.Name)),collapse='|'),
+  cov.file.list = grep(paste0(sampleGroups$Sample.Name,collapse='|'),
       cov.file.list, value=TRUE)
 
-  print(cov.file.list, collapse="\n\t")
-  methylDataRaw = readBismark(cov.file.list, sampleGroups)
-  assign( "methylDataRaw", methylDataRaw, envir=data.env)
+  write.samples = function(s) debug( meta.env$log.file, s)
+  lapply(cov.file.list, write.samples)
+  info( meta.env$log.file, "Reading cov files...")
+  
+  tryCatch({
+    methylDataRaw = readBismark(cov.file.list, sampleGroups)
+    info( meta.env$log.file, "Read cov files")
+    assign( "methylDataRaw", methylDataRaw, envir=data.env)
+  }, error = function(e){
+    warn( meta.env$log.file, "Error reading cov files")
+    warn( meta.env$log.file, e)
+  })
+  
 }
 
 #' Read the target region file and select these regions from methylation data
@@ -131,7 +149,7 @@ func.env$readSamples = function(){
 #' @export
 func.env$readTargetRegions = function(){
   # Read target region annotations
-  info( meta.env$log.file, "Reading target regions")
+  info( meta.env$log.file, paste0("Reading target region file ", meta.env$target.region.file))
 
   methylDataRaw.filter10 = filterByCov(data.env$methylDataRaw, minCov=10, global=F)
 
@@ -669,9 +687,9 @@ func.env$findOverlapsWithGTF = function(){
 # The order in which functions should be run
 func.env$func.order = c(func.env$readSamples, func.env$readTargetRegions, func.env$defineCpGClusters, func.env$runBetaRegression,
   func.env$runNullBetaRegression, func.env$quitForVar, func.env$smoothValues, func.env$findOverlapsWithGTF)
+
 # The corresponding save points
-func.env$func.names = c("Save_1.RData", "Save_2.RData", "Save_3.RData", "Save_4.RData",
-  "Save_5.RData", "Save_6.RData", "Save_7.RData", "Save_8.RData", "Save_9_end.RData")
+func.env$func.names = c(paste0(meta.env$tissue, "_save_", 1:8, ".RData"), paste0(meta.env$tissue,"_save_9_end.RData"))
 
 for( i in 1:length(func.env$func.order)){
   thisFile = func.env$func.names[i]
