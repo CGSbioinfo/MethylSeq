@@ -86,14 +86,14 @@ func.env$runOrSkip = function(nextStepTempFile, tempFile, runFunction){
     tempFile = paste0(meta.env$temp.image.path, tempFile)
     if(file.exists(tempFile)){
       info( meta.env$log.file, paste0("Loading temporary analysis file... ", tempFile))
-      runAndTime( f=function(){load(tempFile, envir = globalenv())} )
+      run.and.time( f=function(){load(tempFile, envir = globalenv())}, log.file = meta.env$log.file )
       info( meta.env$log.file, paste0("Loaded temporary analysis file ", tempFile))
     } else{
-      runAndTime(runFunction)
+      run.and.time(runFunction, meta.env$log.file)
       info( meta.env$log.file, paste0("Saving temporary analysis file... ", tempFile))
 
       # Only save the data values - ensures updated functions will not be overwritten 
-      runAndTime(f=function(){save(data.env, file = tempFile)})
+      run.and.time(f=function(){save(data.env, file = tempFile)}, log.file = meta.env$log.file)
     }
   }
 }
@@ -138,7 +138,7 @@ func.env$readSamples = function(){
 #' @export
 func.env$readTargetRegions = function(){
   # Read target region annotations
-  info( meta.env$log.file, paste0("Reading target region file ", meta.env$target.region.file))
+  info( meta.env$log.file, "Reading target regions")
 
   methylDataRaw.filter10 = filterByCov(data.env$methylDataRaw, minCov=10, global=F)
 
@@ -146,17 +146,21 @@ func.env$readTargetRegions = function(){
   if(is.na(meta.env$target.region.file)){
     methylDataRaw.filter10.rk = methylDataRaw.filter10
   } else {
+    debug( meta.env$log.file, paste0("Importing bed file: ", meta.env$target.region.file))
     capture.region = import.bed(meta.env$target.region.file)
-
+    debug( meta.env$log.file, "Imported bed file")
+    debug( meta.env$log.file, "Merging overlapping regions")
+    
     # Merge overlapping regions
-    capture.region<-reduce(capture.region) %>% # region distribution: distance between regions and region size
-    as.data.frame %>%
-    arrange(seqnames, start) %>% # sort the regions by chromosome (seqnames)and start position
-    group_by(seqnames) %>%  # calculate distance between regions
-    mutate(dist=c(start[-1], end[length(end)])-end)  %>%  # calculate distance from one region to the next one
-    group_by(seqnames) %>% 
-    mutate(size=end-start)  # Calculate size of each region
+    capture.region = GenomicRanges::reduce(capture.region) %>% # region distribution: distance between regions and region size
+      as.data.frame %>%
+      dplyr::arrange(seqnames, start) %>% # sort the regions by chromosome (seqnames)and start position
+      dplyr::group_by(seqnames) %>%  # calculate distance between regions
+      dplyr::mutate(dist=c(start[-1], end[length(end)])-end)  %>%  # calculate distance from one region to the next one
+      dplyr::group_by(seqnames) %>% 
+      dplyr::mutate(size=end-start)  # Calculate size of each region
 
+      debug( meta.env$log.file, "Building GRanges")
     capture.region = GRanges(seqnames=capture.region$seqnames,
       IRanges(start=capture.region$start, end=capture.region$end),
                               strand=capture.region$strand, dist = capture.region$dist, size= capture.region$size)
@@ -169,7 +173,8 @@ func.env$readTargetRegions = function(){
  
   assign( "methylDataRaw.filter10.rk", methylDataRaw.filter10.rk, envir=data.env) # ignore capture region
   rm(methylDataRaw, envir=data.env) # no longer needed
-  rm(methylDataRaw.filter10, envir=data.env) # no longer needed
+  rm(methylDataRaw.filter10) # no longer needed
+  debug( meta.env$log.file, "Created target GRanges")
 }
 
 #' Cluster CpGs and smooth the methylation
@@ -177,6 +182,8 @@ func.env$readTargetRegions = function(){
 #' @export
 func.env$defineCpGClusters = function(){
   info( meta.env$log.file, "Defining Cpg clusters")
+  # gps = paste(unique(colData(data.env$methylDataRaw.filter10.rk)$Group), collapse="' | '")
+  # debug(meta.env$log.file, paste0("Groups to define for: ", gps))
 
   # Within a BSraw object clusterSites searches for agglomerations of CpG sites
   # across all samples. In a first step the data is reduced to CpG sites covered
@@ -186,10 +193,10 @@ func.env$defineCpGClusters = function(){
   # the boundaries of the CpG clusters only. For the subsequent analysis the 
   # methylation data of all CpG sites within these clusters are used.
   data.clustered = BiSeq::clusterSites(data.env$methylDataRaw.filter10.rk,
-    groups=colData(data.env$methylDataRaw.filter10.rk)$Group,
-    perc.samples=0.25, 
-    min.site=5, 
-    max.dist=100, 
+    # groups=unique(colData(data.env$methylDataRaw.filter10.rk)$Group),  # Factor specifying two or more sample groups
+    perc.samples=0.25, # defines CpG sites that are covered in at least 25% of the samples as frequently covered
+    max.dist=100,  # Frequently covered CpGs as close as this or closer belong to the same cluster
+    min.site=5, # Minimum number of frequently covered CpGs in a cluster for cluster to be kept
     mc.cores=meta.env$ncores)
 
   assign( "methylDataRaw.filter10.rk.clustered", data.clustered, envir=data.env)
@@ -494,7 +501,7 @@ func.env$runNullBetaRegression = function(){
 #' @title Save and quit 
 #' @export
 func.env$quitForVar = function(){
-    save(data.env, file = paste0(meta.env$temp.image.path, "Save_6.Rdata"))
+    save(data.env, file = paste0(meta.env$temp.image.path, meta.env$tissue,"_save_6.Rdata"))
     info( meta.env$log.file, "Quitting so you can examine the variogram")
     info( meta.env$log.file, "Adjust the sill value in the analysis info and rerun step 6")  
     quit(save="no", status=0)
@@ -604,7 +611,7 @@ func.env$findOverlapsWithGTF = function(){
   
   DMRs.annotated     = tempoverlap2 %>% group_by(seqnames2) %>% do(merge_hits(.)) %>% as.data.frame
  
-  write.table(file=paste0(outputDir, "DMRs_overlapping_annotated_genes.tsv"), sep="\t",row.names = F, DMRs.annotated)
+  write.table(file=paste0(outputDir, meta.env$tissue, "_DMRs_overlapping_annotated_genes.tsv"), sep="\t",row.names = F, DMRs.annotated)
 
   if(!is.na(meta.env$target.region.file)){
     bed.kit = import.bed(meta.env$target.region.file)
@@ -614,7 +621,7 @@ func.env$findOverlapsWithGTF = function(){
     tempoverlap2.kit = data.frame(tempoverlap2.kit)
     tempoverlap2.kit$seqnames2 = paste0(tempoverlap2.kit$seqnames,'_', tempoverlap2.kit$start)
     DMRs.annotated.kit = tempoverlap2.kit %>% group_by(seqnames2) %>% do(merge_hits(.)) %>% as.data.frame
-    write.table(file=paste0(outputDir, "DMRs_overlapping_target_regions.tsv"),   sep="\t",row.names = F, DMRs.annotated.kit)
+    write.table(file=paste0(outputDir, meta.env$tissue, "_DMRs_overlapping_target_regions.tsv"),   sep="\t",row.names = F, DMRs.annotated.kit)
   }
 
   info( meta.env$log.file, "Plotting DMRs") 
@@ -661,7 +668,7 @@ func.env$findOverlapsWithGTF = function(){
      theme(axis.text.x=element_text(angle=90,vjust=0.5))
 
     #change those 2 lines to change the location where the graphs are saved.
-    ggsave(plot=p, filename=paste0(outputDir, 'DMR_',df$seqnames2[1],'.png'))
+    ggsave(plot=p, filename=paste0(outputDir, meta.env$tissue,'_DMR_',df$seqnames2[1],'.png'))
   }
 
   invisible(lapply(data.env$DMRs, plotDMR))
