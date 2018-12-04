@@ -1,6 +1,41 @@
 # Common functions for the methylation sequencing 
 # pipline.
 
+install.missing = function(packages, biopackages) {
+  
+  source("https://bioconductor.org/biocLite.R")
+  
+  installIfNeededFromBioconductor = function(pkg){
+    if(pkg %in% rownames(installed.packages()) == FALSE) {
+      biocLite(pkg)
+    }
+    suppressPackageStartupMessages(library(pkg, character.only = TRUE, warn.conflicts = FALSE))
+  }
+  
+  installIfNeeded = function(pkg){
+    if(pkg %in% rownames(installed.packages()) == FALSE) {
+      install.packages(pkg, dependencies = TRUE)
+    }
+    suppressPackageStartupMessages(library(pkg, character.only = TRUE, warn.conflicts = FALSE))
+  }
+
+  lapply(biopackages, installIfNeededFromBioconductor)
+  lapply(packages, installIfNeeded)
+}
+
+#' Log the details of the current session info to the given
+#' file.
+#' @title Log session info
+#' @param log.file the file path to log to
+#' @export
+log.session.info = function(log.file){
+  debug( log.file, paste0("Running on ", system("hostname", intern = TRUE)))
+  debug( log.file, paste0("Platform: ", sessionInfo()$running ))
+  debug( log.file, paste0("R version: ", getRversion()))
+  log.pkgs = function(pkg) debug( log.file, paste0(pkg$Package, " - ", pkg$Version))
+  invisible(lapply(sessionInfo()$otherPkgs, log.pkgs))
+}
+
 #' This function checks if a file path exists.
 #' If the path does not exist, prints the given
 #' message and quits with exit code 1
@@ -9,13 +44,26 @@
 #' @param msg the error message to print if path is missing
 #' @examples
 #' dir = "/path/to/folder/"
-#' pathExistsOrQuit(dir)
+#' quit.if.not.exists(dir)
 #' setwd(dir)
 #' @export
-pathExistsOrQuit = function(path, msg){
+quit.if.not.exists = function(path, msg){
     if(!file.exists(path)){
         cat(msg, "'", path, "' not found\n" )
         quit(save="no", status=1)
+    }
+}
+
+#' This function creates a directory if not present.
+#' @title Check if the given path exists and create if needed
+#' @param dir the directory path to check
+#' @examples
+#' dir = "/path/to/folder/"
+#' ensure.dir.exists(dir)
+#' @export
+ensure.dir.exists = function(dir){
+    if(!dir.exists(dir)){
+        dir.create(dir)
     }
 }
 
@@ -93,6 +141,10 @@ logToFile = function(file, msg){
 #' @export
 info = function(file, msg){
     logToFile(file, paste("INFO", msg, sep="\t"))
+}
+
+debug = function(file, msg){
+    logToFile(file, paste("DEBUG", msg, sep="\t"))
 }
 
 #' Log a message to file with log level WARN
