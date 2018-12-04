@@ -2,31 +2,9 @@
 # Extended comments are mostly copied from the BiSeq guide:
 # https://www.bioconductor.org/packages/devel/bioc/vignettes/BiSeq/inst/doc/BiSeq.pdf
 
-cat("Loading R packages ...\n")
-
-suppressMessages(library(BiSeq))
-suppressMessages(library(GenomicRanges))
-suppressMessages(library(rtracklayer))
-suppressMessages(library(dplyr))
-suppressMessages(library(purrr))
-suppressMessages(library(ggplot2))
-suppressMessages(library(reshape))
-suppressMessages(library(parallel))
-
 meta.env = new.env() # parameters for the analysis
 data.env = new.env() # data for the ongoing analysis - serialisable
 func.env = new.env() # functions defined in this file
-
-meta.env$sample.group.file  = commandArgs(TRUE)[1]
-meta.env$cov.file.folder    = commandArgs(TRUE)[2]
-meta.env$target.region.file = commandArgs(TRUE)[3] # Can be NA
-meta.env$temp.folder.name   = commandArgs(TRUE)[4]
-meta.env$ncores             = as.numeric(commandArgs(TRUE)[5])
-meta.env$chunk.size         = as.numeric(commandArgs(TRUE)[6]) # number of rows per data chunk in beta regression
-meta.env$gtf.file           = commandArgs(TRUE)[7]
-meta.env$dmr.bandwidth      = as.numeric(commandArgs(TRUE)[8])
-meta.env$sill               = as.numeric(commandArgs(TRUE)[9])
-meta.env$tissue             = commandArgs(TRUE)[10] # choose the tissue to subset by
 
 #' This function loads the external functions source file.
 #' Detects the directory containing this script, and loads the function
@@ -44,6 +22,21 @@ loadFunctionsFile = function(){
 }
 
 loadFunctionsFile()
+
+cat("Loading R packages ...\n")
+install.missing(packages    = c("dplyr", "purrr", "ggplot2", "reshape", "parallel"),
+                biopackages = c("BiSeq", "GenomicRanges", "rtracklayer"))
+
+meta.env$sample.group.file  = commandArgs(TRUE)[1]
+meta.env$cov.file.folder    = commandArgs(TRUE)[2]
+meta.env$target.region.file = commandArgs(TRUE)[3] # Can be NA
+meta.env$temp.folder.name   = commandArgs(TRUE)[4]
+meta.env$ncores             = as.numeric(commandArgs(TRUE)[5])
+meta.env$chunk.size         = as.numeric(commandArgs(TRUE)[6]) # number of rows per data chunk in beta regression
+meta.env$gtf.file           = commandArgs(TRUE)[7]
+meta.env$dmr.bandwidth      = as.numeric(commandArgs(TRUE)[8])
+meta.env$sill               = as.numeric(commandArgs(TRUE)[9])
+meta.env$tissue             = commandArgs(TRUE)[10] # choose the tissue to subset by
 
 ##################
 #
@@ -70,17 +63,13 @@ meta.env$temp.image.path = paste0(dirname(meta.env$sample.group.file),"/", meta.
 ensure.dir.exists(meta.env$temp.image.path)
 
 meta.env$server = system("hostname", intern = TRUE)
-
 meta.env$log.file = paste0(meta.env$temp.image.path, format.Date(Sys.time(), "%Y-%m-%d_%H-%M-%S"), ".log.txt")
-debug( meta.env$log.file, paste0("Running main on ", meta.env$server))
-debug( meta.env$log.file, paste0("Platform: ", sessionInfo()$running ))
-debug( meta.env$log.file, paste0("R version: ", getRversion()))
-log.pkgs = function(pkg) debug( meta.env$log.file, paste0(pkg$Package, " - ", pkg$Version))
-invisible(lapply(sessionInfo()$otherPkgs, log.pkgs))
+log.session.info(meta.env$log.file)
 
 ##################
 #
 # Define the functions
+# for each analysis step
 #
 ##################
 
@@ -117,7 +106,7 @@ func.env$readSamples = function(){
   info( meta.env$log.file, paste0("Reading sample groups file '", meta.env$sample.group.file,"'..."))
 
   sampleGroups = read.csv(meta.env$sample.group.file, sep="\t", header=T, stringsAsFactors=F) %>%
-    dplyr::filter(Tissue == meta.env$tissue) %>% dplyr::filter(Type == "Old")
+    dplyr::filter(Tissue == meta.env$tissue)
   rownames(sampleGroups) = as.character(sampleGroups$Sample.Name)
   assign( "sampleGroups", sampleGroups, envir=data.env)
   info( meta.env$log.file, paste0("Found ", nrow(sampleGroups), " samples for ", meta.env$tissue))

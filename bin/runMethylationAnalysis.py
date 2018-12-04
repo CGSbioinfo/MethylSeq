@@ -11,6 +11,7 @@ import mapping
 import pipeline 
 import plotting
 import validation
+import socket
 
 
 __version__ = 'v02'
@@ -190,7 +191,7 @@ if __name__ == '__main__':
 
     setup_logger()
     _logger = logging.getLogger(__name__)
-    _logger.debug(("Started script" ))
+    _logger.debug(("Started script on %s" % socket.gethostname()))
     check_info_file()
 
     # Run the command input

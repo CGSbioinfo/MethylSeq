@@ -1,7 +1,14 @@
 # Common functions for the methylation sequencing 
 # pipline.
 
-install.missing = function(packages, biopackages) {
+#' Load the requested packages, installing them if needed.
+#' @title Install missing packages
+#' @param packages the R packages to install
+#' @param biopackages the Bioconductor packages to install
+#' @examples
+#' install.missing(packages=c("ggplot2", "dplyr"), biopackages=c("BiSeq", "rtracklayer"))
+#' @export
+install.missing = function(packages, biopackages=c()) {
   
   source("https://bioconductor.org/biocLite.R")
   

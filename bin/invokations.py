@@ -428,8 +428,8 @@ def extract_methylation(analysis_info_file='analysis_info.txt',
 
     _logger.info("Invoking apply_async with %d processes" % ninstances)
 
-    for i in sampleNames:
-        pool.apply_async(_methylationExtraction, [i, ai, in_dir, out_dir,remove_bases_dict, dedup, cx])
+    # for i in sampleNames:
+        # pool.apply_async(_methylationExtraction, [i, ai, in_dir, out_dir,remove_bases_dict, dedup, cx])
 
     pool.close()
     pool.join()
@@ -441,7 +441,7 @@ def extract_methylation(analysis_info_file='analysis_info.txt',
 
 def calculate_coverage(analysis_info_file='analysis_info.txt',
     cov_dir='methylExtraction/',
-    sample_names_file='sample_names.txt'):
+    sample_names_file='sample_groups.txt'):
     '''
     Calculate the sequence coverage of the genome and target region
     '''

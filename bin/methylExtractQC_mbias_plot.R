@@ -1,14 +1,3 @@
-cat("Loading R packages ...\n")
-
-suppressMessages(library(ggplot2))
-suppressMessages(library(reshape))
-suppressMessages(library(dplyr))
-
-# Read the input arguments
-in_dir      =commandArgs(TRUE)[1]
-sample_names=commandArgs(TRUE)[2]
-pattern     =commandArgs(TRUE)[3]
-outfile     =commandArgs(TRUE)[4]
 
 #' This function loads the external functions file.
 #' @title Load external functions
@@ -23,6 +12,14 @@ loadFunctionsFile = function(){
 }
 
 loadFunctionsFile()
+cat("Loading R packages ...\n")
+install.missing(packages=c("dplyr", "ggplot2", "reshape"))
+
+# Read the input arguments
+in_dir      =commandArgs(TRUE)[1]
+sample_names=commandArgs(TRUE)[2]
+pattern     =commandArgs(TRUE)[3]
+outfile     =commandArgs(TRUE)[4]
 
 ##################
 #
@@ -31,8 +28,8 @@ loadFunctionsFile()
 #
 ##################
 
-pathExistsOrQuit(sample_names, "Sample name file") 
-pathExistsOrQuit(in_dir, "Input folder")
+quit.if.not.exists(sample_names, "Sample name file") 
+quit.if.not.exists(in_dir, "Input folder")
 
 
 ##################
