@@ -4,22 +4,15 @@
     analysis pipelines for making QC plots
 '''
 import os
-import sys
 import re
-import errno
-import glob
-import time
-import pickle
 import logging
 from joblib import Parallel, delayed
-import multiprocessing
-import subprocess
 import functions
-import argparse
+import pipeline
 
 def _tables(i):
-    logger = logging.getLogger("runMethylationAnalysis.plotting")
-    logger.info("Making tables for "+i)
+    _logger = logging.getLogger(__name__)
+    _logger.info("Making tables for "+i)
     outdir = re.sub('fastqc_data.txt', '', i)
 
     fastq_data = i
@@ -71,13 +64,12 @@ def _tables(i):
                 else:
                     break
             i += 1
-    # functions.runAndCheck("srun python bin/create_fastqcTables.py " + i + " all " + outdir, "Error making fastqc tables")
 
 def _plots(i, in_dir, readType, out_dir_report, suffix_name, plot_device):
-    logger = logging.getLogger("runMethylationAnalysis.plotting")
-    logger.info("Making plots for "+i)
-    cmd = '/usr/bin/Rscript bin/create_fastqcPlots_perSample.R ' + in_dir + ' ' + i + ' ' + readType + ' ' + out_dir_report + ' ' + suffix_name + ' ' + plot_device
-    functions.srun(cmd)
+    _logger = logging.getLogger(__name__)
+    _logger.info("Making plots for "+i)
+    cmd = '/usr/bin/Rscript src/create_fastqcPlots_perSample.R %s %s %s %s %s %s' % (in_dir, i, readType, out_dir_report, suffix_name, plot_device)
+    pipeline.srun(cmd)
 
 def fastqc_tables_and_plots(analysis_info_file='analysis_info.txt', 
     in_dir='rawReads/', 
@@ -86,8 +78,8 @@ def fastqc_tables_and_plots(analysis_info_file='analysis_info.txt',
     suffix_name= '_plot',
     sample_names_file='sample_names.txt',
     plot_device = 'png'):
-    
-    logger = logging.getLogger("runMethylationAnalysis.plotting")
+    _logger = logging.getLogger(__name__)
+    _logger.debug("Starting generation of fastqc tables and plots")
 
     # Get wd
     path=os.getcwd()
@@ -111,15 +103,21 @@ def fastqc_tables_and_plots(analysis_info_file='analysis_info.txt',
     readType=ai['readType']
 
     # Create tables
+    logging.debug("Creating tables")
     files=functions.get_filepaths(in_dir)
     files = [files[y] for y, x in enumerate(files) if re.findall("fastqc_data.txt", x)] 
     Parallel(n_jobs=ninstances)(delayed(_tables)(i) for i in files)
 
 
     # Create plots
+    _logger.debug("Creating plots per sample")
     functions.make_sure_path_exists(out_dir_report)
     Parallel(n_jobs=ninstances)(delayed(_plots)(i, in_dir, readType, out_dir_report, suffix_name, plot_device) for i in sampleNames)
 
-    logger.info("Making plots for all samples")
-    functions.srun('/usr/bin/Rscript bin/create_fastqcPlots_allSamples.R ' + in_dir + ' ' + sample_names_file + ' ' + readType + ' ' + out_dir_report + ' ' + suffix_name + ' ' + plot_device)
+    _logger.info("Making plots for all samples")
+    pipeline.srun('/usr/bin/Rscript src/create_fastqcPlots_allSamples.R ' + in_dir + ' ' + sample_names_file + ' ' + readType + ' ' + out_dir_report + ' ' + suffix_name + ' ' + plot_device)
 
+def test():
+    _logger = logging.getLogger(__name__)
+    _logger.info("Testing logging from plotting module")
+    pipeline.testLogging()

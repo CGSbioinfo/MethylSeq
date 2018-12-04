@@ -15,19 +15,21 @@ from joblib import Parallel, delayed
 import multiprocessing
 import subprocess
 import functions
+import pipeline
+
 
 def create_analysis_info_file(analysis_info_file="analysis_info.txt"):
     lines=['working_directory = ', 'run_folder = ', 'run_samplesheet = ', 'bcl2fastq_output = fastq/ ', 
     'readType = pairedEnd', 'reference_genome = ', 
     'bismark_params = --bowtie2; --bam; -N 0; -L 20; -D 15; -R 2; --score_min L,0,-0.2; ', 
     'methyl_extract_params= --bedGraph; --gzip; --merge_non_CpG;', 'target_regions_bed = ', 'ncores = 10', 
-    'ninstances = 3', 'clean_files = False', 'sill = 1', 'dmr_bandwidth = 50', 'gtf_file = ', 'cx_extract = True']
+    'ninstances = 3', 'clean_files = False', 'sill = 1', 'dmr_bandwidth = 50', 'gtf_file = ', 'cx_extract = False']
     outfile=open(analysis_info_file,'w')
     for l in lines:
         outfile.write(l + '\n')
     outfile.close()
 
-def create_remove_bases_file_info(outfile_name):
+def create_remove_bases_file_info(outfile_name, sample_names_file='./sample_names.txt'):
     """ Creates a file of bases to remove.
 
         Creates a file for base trimming in a methylSeq project. This is tab delimited
@@ -35,17 +37,20 @@ def create_remove_bases_file_info(outfile_name):
 
         --outfile_name - the name of the output file.
     """ 
-    lines=['sample\t5R1\t3R1\t5R2\t3R2']
+    lines=['sample\t5R1\t3R1\t5R2\t3R2\n']
+    sampleNames = functions.read_sample_names(sample_names_file)
+    for name in sampleNames:
+        lines.append(name+'\t\n')
     outfile=open(outfile_name,'w')
     for l in lines:
-        outfile.write(l + '\n')
+        outfile.write(l)
     outfile.close()
 
 def invoke_bcl2fastq(analysis_info_file):
 
     '''This function runs bcl2fastq.
 
-    If uses the parameters in the analysis_info file.analysis_info_file.
+    It uses the parameters in the analysis_info file.
     If bcl2fastq fails, the script will quit with exit code 1, otherwise
     it will quit with exit code 0
     '''
@@ -54,7 +59,7 @@ def invoke_bcl2fastq(analysis_info_file):
 
     cmdStr = "bcl2fastq -R " + ai['run_folder'] + " -o " + ai['bcl2fastq_output'] + " --no-lane-splitting -l NONE --sample-sheet " + ai['run_samplesheet']
 
-    functions.srun(cmdStr, ncores=ai['ncores'], mem=20)
+    pipeline.srun(cmdStr, ncores=ai['ncores'], mem=20)
 
 
 def create_sample_names(analysis_info_file, in_dir='bcl2fastq_output', out_file='./sample_names.txt'):
@@ -146,10 +151,10 @@ def _qc_check(i, in_dir, out_dir, gz):
     functions.make_sure_path_exists(out_dir+i)
 
     cmd_str = "fastqc "  + in_dir + i + "/" + i + "*_R1*.fastq" + gz + " --outdir=" + out_dir + i + " --nogroup --extract "
-    functions.srun(cmd_str)
+    pipeline.srun(cmd_str)
     if pairedReads_temp:
         cmd_str = "fastqc " + in_dir + i + "/" + i + "*_R2*.fastq" + gz + " --outdir=" + out_dir + i + " --nogroup --extract"
-        functions.srun(cmd_str)
+        pipeline.srun(cmd_str)
 
 def qcReads(analysis_info_file='analysis_info.txt', 
     in_dir='rawReads/', 
@@ -161,9 +166,8 @@ def qcReads(analysis_info_file='analysis_info.txt',
      - The input and output default is rawReads/samplesubfolder/
      - It also returns a table and a plot with the number of reads for each sample, the output by default is Report/figure/data 
      """
-
-    logger = logging.getLogger("runMethylationAnalysis.invokations")
-
+    _logger = logging.getLogger(__name__)
+    
     # Set path of working directory
     ai=functions.read_analysis_info_file(analysis_info_file)
     path=os.getcwd()
@@ -194,11 +198,11 @@ def qcReads(analysis_info_file='analysis_info.txt',
 
     # Run fastqc
     # print "Running fastqc"
-    logger.info("Running fastqc")
+    _logger.info("Running fastqc")
 
     pool = multiprocessing.Pool(processes=ninstances)
 
-    logger.info("Invoking apply_async with %d processes" % ninstances)
+    _logger.info("Invoking apply_async with %d processes" % ninstances)
 
     for i in sampleNames:
         pool.apply_async(_qc_check, [i, in_dir, out_dir, gz])
@@ -209,8 +213,8 @@ def qcReads(analysis_info_file='analysis_info.txt',
     # Parallel(n_jobs=ninstances)(delayed(_qc_check)(i, in_dir, out_dir, gz) for i in sampleNames)
 
     # Number of reads per sample
-    logger.info("Running index QC")
-    functions.runAndCheck("/usr/bin/Rscript bin/indexQC.R " + in_dir + " " + out_dir_report, "Error in index QC") 
+    _logger.info("Running index QC")
+    pipeline.runAndCheck("/usr/bin/Rscript src/indexQC.R " + in_dir + " " + out_dir_report, "Error in index QC") 
 
 
 def _trim(i, in_dir, out_dir, gz, ncores):
@@ -223,9 +227,9 @@ def _trim(i, in_dir, out_dir, gz, ncores):
     cmdStr ="trim_galore --gzip"
     if pairedReads_temp:
         cmdStr = cmdStr + " --paired --fastqc --fastqc_args '--nogroup --extract' --output_dir " + out_dir + " " + in_dir + i + "/" + i + "*_R1*.fastq" + gz + " " + in_dir + i + "/" + i + "*_R2*.fastq" + gz
-        functions.srun(cmdStr)
+        pipeline.srun(cmd=cmdStr, ncores=1, mem=20)
     else:
-        functions.srun(cmdStr + "--fastqc --fastqc_args '--nogroup --extract' --output_dir " + out_dir + " " + in_dir + i + "/" + i + "*_R1*.fastq" + gz)
+        pipeline.srun(cmdStr + "--fastqc --fastqc_args '--nogroup --extract' --output_dir " + out_dir + " " + in_dir + i + "/" + i + "*_R1*.fastq" + gz, ncores=1, mem=20)
 
 
 def trim_reads(analysis_info_file='analysis_info.txt', 
@@ -234,8 +238,8 @@ def trim_reads(analysis_info_file='analysis_info.txt',
     out_dir_report='Report/figure/data/', 
     sample_names_file='sample_names.txt'):
     
-    logger = logging.getLogger("runMethylationAnalysis.invokations")
-
+    _logger = logging.getLogger(__name__)
+    
     path=os.getcwd()
     os.chdir(path)
     ai=functions.read_analysis_info_file(analysis_info_file)    
@@ -262,11 +266,11 @@ def trim_reads(analysis_info_file='analysis_info.txt',
 
     # Run trimm galore
     functions.make_sure_path_exists(out_dir)
-    logger.info("Trimming reads")
+    _logger.info("Trimming reads")
 
     pool = multiprocessing.Pool(processes=ninstances)
 
-    logger.info("Invoking apply_async with %d processes" % ninstances)
+    _logger.info("Invoking apply_async with %d processes" % ninstances)
 
     for i in sampleNames:
         pool.apply_async(_trim, [i, in_dir, out_dir, gz, ncores])
@@ -274,59 +278,62 @@ def trim_reads(analysis_info_file='analysis_info.txt',
     pool.close()
     pool.join()
 
-    # Parallel(n_jobs=ninstances)(delayed(_trim)(i, in_dir, out_dir, gz, ncores) for i in sampleNames)
     functions.make_sure_path_exists(out_dir_report)
     
     # Generate summary stats
-    cmd_str = ("/usr/bin/Rscript bin/trimming_summary.R %s %s %s " %
+    cmd_str = ("/usr/bin/Rscript src/trimming_summary.R %s %s %s " %
         (in_dir, out_dir, out_dir_report))
-    functions.srun(cmd_str)
+    pipeline.srun(cmd_str)
 
 
-def _methylationExtraction(i, ai, in_dir, out_dir, remove_bases_dict, dedup, cx):
+def _methylationExtraction(i, ai, in_dir, out_dir, remove_bases_dict, isDedup, cx):
     '''
     Run the bismark methylation extraction on the given sample.in_dir
 
     If a non-empty dictionary is supplied in remove_bases_dict, the corresponding
     bases will be trimmed
     '''
-    logger = logging.getLogger("runMethylationAnalysis.invokations")
+    _logger = logging.getLogger(__name__)
+
     params=ai['methyl_extract_params'].replace(';','')
     alignedReads = os.listdir(in_dir)
     alignedReads = [alignedReads[y] for y, x in enumerate(alignedReads) if re.findall(i, x)]
     if not alignedReads:
-        logger.warning("No aligned reads found for %s." % i)
+        _logger.warning("No aligned reads found for %s." % i)
         return
 
     # Filter to filenames containing the sample name
     dedupregex = re.compile("bismark_bt2_.*deduplicated.bam$")
     bamregex   = re.compile("val_1.fq.gz_bismark_bt2_pe.bam$")
 
-    dedup = filter(dedupregex.search, alignedReads)
-    bams = filter(bamregex.search, alignedReads)
+    dedup_files = filter(dedupregex.search, alignedReads)
+    bam_files   = filter(bamregex.search, alignedReads)
 
-    if dedup == True:
-        if not dedup:
-            logger.warning("No deduplicated bam files found for %s" % i)
+    # Sanity check: if we requested deduplication, make sure the files exist
+    if isDedup == True:
+        _logger.debug("Attempting to extract from deduplicated file")
+        if not dedup_files:
+            _logger.warning("No deduplicated bam files found for %s" % i)
             return;
         else: 
-            bamFile = dedup[0]
+            bamFile = dedup_files[0]
     else:
-        if not bams:
-            logger.warning("No bam files found for %s" % i)
+        _logger.debug("Not attempting to extract from deduplicated file")
+        if not bam_files:
+            _logger.warning("No bam files found for %s" % i)
             return;
         else:
-            bamFile = bams[0]
+            bamFile = bam_files[0]
     
     if not bamFile:
-        logger.warning("No bam file to process for %s." % i)
+        _logger.warning("No bam file to process for %s." % i)
         return
 
     bamFile = in_dir + bamFile
 
     # Create the ignore string if needed
     if(remove_bases_dict):
-        logger.info("Clipping bases for %s" % i)
+        _logger.info("Clipping bases for %s" % i)
         basesInfo=remove_bases_dict[i]
         logFile = ("%smethylExtract_REMOVEDBASES_log_%s.txt"
             % (out_dir, i))
@@ -344,9 +351,9 @@ def _methylationExtraction(i, ai, in_dir, out_dir, remove_bases_dict, dedup, cx)
         ( ai['ncores'], params, cx_string, out_dir, ignoreString ))
 
     cmdStr = ('bismark_methylation_extractor %s %s &>%s' % (param_string, bamFile, logFile ))
-    logger.info("Extracting methylation from "+i)
-    functions.srun(cmdStr, ncores=ai['ncores'], mem=20)
-    logger.info("Extracted methylation from "+i)
+    _logger.info("Extracting methylation from "+i)
+    pipeline.srun(cmd=cmdStr, ncores=ai['ncores'], mem=20)
+    _logger.info("Extracted methylation from "+i)
 
 
 def _createRemoveBaseDict(remove_bases_file):
@@ -370,14 +377,14 @@ def _createRemoveBaseDict(remove_bases_file):
 def _makeMbiasPlots(remove_bases_dict, out_dir, sample_names_file):
     '''Call the R script to generate methylation bias plots.
     '''
-    logger = logging.getLogger("runMethylationAnalysis.invokations")
+    _logger = logging.getLogger(__name__)
     clipped = "_clipped" if remove_bases_dict else ""
     out_file = "Report/figure/methExtractQC/Mbias_plot%s.pdf" % clipped
 
-    cmdStr = ('/usr/bin/Rscript bin/methylExtractQC_mbias_plot.R %s %s .M-bias.txt %s'
+    cmdStr = ('/usr/bin/Rscript src/methylExtractQC_mbias_plot.R %s %s .M-bias.txt %s'
             % (out_dir, sample_names_file, out_file))
-    logger.info("Making M-bias plots")
-    functions.srun(cmdStr)
+    _logger.info("Making M-bias plots")
+    pipeline.srun(cmd=cmdStr, mem=5)
        
 def extract_methylation(analysis_info_file='analysis_info.txt',
     in_dir='alignedReads/', 
@@ -388,11 +395,10 @@ def extract_methylation(analysis_info_file='analysis_info.txt',
     '''
     Run the bismark methylation extraction
     '''
-
-    logger = logging.getLogger("runMethylationAnalysis.invokations")
+    _logger = logging.getLogger(__name__)
     ai=functions.read_analysis_info_file(analysis_info_file)
 
-    cx = ai['cx_extract']
+    cx = ai['cx_extract']=='True'
 
     path = functions.getWorkingDir(analysis_info_file)
 
@@ -409,7 +415,7 @@ def extract_methylation(analysis_info_file='analysis_info.txt',
     in_dir = path + in_dir
 
     if not os.path.exists(in_dir):
-        logger.error("Input directory was not found: " + in_dir)
+        _logger.error("Input directory was not found: " + in_dir)
         sys.exit(1)
 
     out_dir = path + out_dir
@@ -418,12 +424,9 @@ def extract_methylation(analysis_info_file='analysis_info.txt',
 
     # Read remove bases file if present or create an empty dict otherwise
     remove_bases_dict = _createRemoveBaseDict(remove_bases_file)
-
-    # Parallel(n_jobs=ninstances)(delayed(_methylationExtraction)(i, ai, in_dir, out_dir,remove_bases_dict, dedup, cx) for i in sampleNames)
-
     pool = multiprocessing.Pool(processes=ninstances)
 
-    logger.info("Invoking apply_async with %d processes" % ninstances)
+    _logger.info("Invoking apply_async with %d processes" % ninstances)
 
     for i in sampleNames:
         pool.apply_async(_methylationExtraction, [i, ai, in_dir, out_dir,remove_bases_dict, dedup, cx])
@@ -442,11 +445,10 @@ def calculate_coverage(analysis_info_file='analysis_info.txt',
     '''
     Calculate the sequence coverage of the genome and target region
     '''
-
-    logger = logging.getLogger("runMethylationAnalysis.invokations")
+    _logger = logging.getLogger(__name__)
 
     if not os.path.exists(cov_dir):
-        logger.error("Input directory was not found: " + cov_dir)
+        _logger.error("Input directory was not found: " + cov_dir)
         sys.exit(1)
 
     ai=functions.read_analysis_info_file(analysis_info_file)
@@ -454,11 +456,11 @@ def calculate_coverage(analysis_info_file='analysis_info.txt',
     wg_output = 'Report/figure/methExtractQC/coverage_rawData_wg.pdf'
     tr_output = 'Report/figure/methExtractQC/coverage_rawData_tr.pdf'
 
-    cmdStr = ('/usr/bin/Rscript bin/coverage_methExtractedData.r %s %s %s %s %s '
+    cmdStr = ('/usr/bin/Rscript src/coverage_methExtractedData.r %s %s %s %s %s '
         %(sample_names_file, cov_dir, wg_output, tr_output, ai['target_regions_bed']))
 
-    logger.info("Calculating coverage in genome and target regions")
-    functions.srun(cmdStr)
+    logging.info("Calculating coverage in genome and target regions")
+    pipeline.srun(cmdStr)
 
 
 
@@ -470,22 +472,20 @@ def analyse_methylation(analysis_info_file='analysis_info.txt',
     '''
     Run differential methylation analysis in BiSeq.
     '''
-
-    logger = logging.getLogger("runMethylationAnalysis.invokations")
-
+    _logger = logging.getLogger(__name__)
     if not os.path.exists(cov_dir):
-        logger.error("Input directory was not found: " + cov_dir)
+        logging.error("Input directory was not found: " + cov_dir)
         sys.exit(1)
         
     ai=functions.read_analysis_info_file(analysis_info_file)
 
     temp_folder_name = functions.slash_terminate(temp_folder_name)
 
-    cmdStr = ('/usr/bin/Rscript bin/analyseMethylationPatterns.r %s %s %s %s %s %s %s %s %s ' 
-        % (sample_group_file, cov_dir, ai['target_regions_bed'], temp_folder_name, ai['ncores'],  chunk_size, ai['gtf_file'], ai['dmr_bandwidth'], ai['sill']))
+    cmdStr = ('/usr/bin/Rscript src/analyseMethylationPatterns.r %s %s %s %s %s %s %s %s %s %s' 
+        % (sample_group_file, cov_dir, ai['target_regions_bed'], temp_folder_name, ai['ncores'],  chunk_size, ai['gtf_file'], ai['dmr_bandwidth'], ai['sill'], ai['tissue']))
 
-    logger.info("Running methylation analysis")
-    functions.srun(cmdStr, ncores=ai['ncores'], mem=20)
+    _logger.info("Running methylation analysis")
+    pipeline.srun(cmdStr, ncores=ai['ncores'], mem=120)
 
 
 

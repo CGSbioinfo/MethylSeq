@@ -16,6 +16,7 @@ from joblib import Parallel, delayed
 import multiprocessing
 import subprocess
 import functions
+import pipeline
 
 def _alignment(sampleName, ai, in_dir, out_dir, gz):
     '''Perform alignment of reads using Bismark params
@@ -30,7 +31,7 @@ def _alignment(sampleName, ai, in_dir, out_dir, gz):
     --out_dir - the output directory
     --gz - the gzip suffix to use when searching for files (empty string if files are not compressed)
     '''
-    logger = logging.getLogger("runMethylationAnalysis.mapping")
+    logger = logging.getLogger(__name__)
     bismark_params=ai['bismark_params'].replace(';','')
     
     # Get all files in the input dir as a list
@@ -64,15 +65,11 @@ def _alignment(sampleName, ai, in_dir, out_dir, gz):
         cmdStr = ('bismark %s --output_dir %s %s -1 %s -2 %s &>%sbismark_log_%s.txt' 
             % ( bismark_params, out_dir, ai['reference_genome'], r1, r2, out_dir, sampleName ))
         logger.info("Aligning %s" % sampleName)
-        functions.srun(cmdStr, ai['ncores'], 40)
+        pipeline.srun(cmd=cmdStr, ncores=ai['ncores'], mem=40)
     else:
         logger.info("No read 2 for %s" % sampleName)
         logger.warning("Single reads not currently implemented")
     logger.info("Alignment complete for %s" % sampleName)
-        # r1 = in_dir + [trimmedReads[y] for y, x in enumerate(trimmedReads) if re.findall( "_R1_.*val_1.fq", x)][0]
-        # print "Found "+str(len(r1))+" r1 files"
-        # cmdStr = str("srun -c %(ncores)i -mem=20G bismark " + bismark_params + " --output_dir " + out_dir + " " + ai['reference_genome'] +" -1 " + r1 + " -2 " + r2 + " &>" + out_dir + "/bismark_log_"+sampleName+".txt ")
-        # functions.runAndCheck(cmdStr, "Error in bismark read mapping")
 
 def _deduplicate(sampleName, ai, in_dir, out_dir):
     '''Perform deduplication of reads using Bismark params.
@@ -83,7 +80,7 @@ def _deduplicate(sampleName, ai, in_dir, out_dir):
         --in_dir - the input directory
         --out_dir - the output directory
     '''
-    logger = logging.getLogger("runMethylationAnalysis.mapping")
+    logger = logging.getLogger(__name__)
     alignedReads = os.listdir(out_dir)
 
      # Filter to filenames containing the sample name
@@ -109,7 +106,7 @@ def _deduplicate(sampleName, ai, in_dir, out_dir):
     alignedReads = [alignedReads[y] for y, x in enumerate(alignedReads) if re.findall(sampleName, x)]
     
     logger.info("Deduplicating %s" % sampleName)
-    functions.srun(cmdStr, ai['ncores'], 40)
+    pipeline.srun(cmd=cmdStr, ncores=ai['ncores'], mem=40)
     logger.info("Deduplication complete for %s" % sampleName)
 
 def map_reads(analysis_info_file='analysis_info.txt', 
@@ -128,7 +125,7 @@ def map_reads(analysis_info_file='analysis_info.txt',
         --run - the command to run (options: all, bismark_alignment, deduplicate_bismark; default: all)
     '''
 
-    logger = logging.getLogger("runMethylationAnalysis.mapping")
+    logger = logging.getLogger(__name__)
 
     # Set path of working directory
     ai   = functions.read_analysis_info_file(analysis_info_file)
@@ -153,18 +150,27 @@ def map_reads(analysis_info_file='analysis_info.txt',
     gz = functions.check_gz(in_dir, "fq")
     logger.debug("Appending gz string '%s'" % gz)
 
-    logger.info("Setting to run in batches of %i instances with %i cores per instance" % (ninstances, ncores))
-
     # Run bismark alignment
     if run == 'all' or run =='bismark_alignment': 
+        pool = multiprocessing.Pool(processes=ninstances)
         logger.info("Running bismark alignment")
         functions.make_sure_path_exists(out_dir)
 
+        logger.info("Invoking apply_async with %d processes" % ninstances)
+        for i in sampleNames:
+            pool.apply_async(_alignment, [i, ai, in_dir, out_dir, gz])
+        pool.close()
+        pool.join()
         # Use Parallel to batch the task into groups of ninstances
         # alignments so the cluster is not overloaded.
-        Parallel(n_jobs=ninstances)(delayed(_alignment)(i, ai, in_dir, out_dir, gz) for i in sampleNames)
-
+        # Parallel(n_jobs=ninstances)(delayed(_alignment)(i, ai, in_dir, out_dir, gz) for i in sampleNames)
+    
     # Run deduplication
     if run == 'all' or run == 'deduplicate_bismark':
+        pool = multiprocessing.Pool(processes=ninstances)
         logger.info("Running deduplication")
-        Parallel(n_jobs=ninstances)(delayed(_deduplicate)(i, ai, in_dir, out_dir) for i in sampleNames)
+        logger.info("Invoking apply_async with %d processes" % ninstances)
+        for i in sampleNames:
+            pool.apply_async(_deduplicate, [i, ai, in_dir, out_dir])
+        pool.close()
+        pool.join()   

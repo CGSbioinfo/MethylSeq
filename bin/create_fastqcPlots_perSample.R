@@ -50,10 +50,12 @@ files=list.files(path = in_dir, full.names = TRUE, recursive = TRUE)
 files=files[grep(sample.name,files)]
 
 generate_qc_plot = function(type){
+  cat("Making QC for", sample.name, "of type", type,"...\n")
   sample_temp = sample.name
   files_temp  = files[grep(type,files)]
   r1          = files_temp[grep('_R1_',files_temp)]
-  dat_r1      = read.table(r1, stringsAsFactors = FALSE)
+  cat("Reading file", r1, "...\n")
+  dat_r1      = read.table(r1, stringsAsFactors = FALSE, sep="\t")
   
   if (readType=='pairedEnd'){
     r2        = files_temp[grep('_R2_',files_temp)]

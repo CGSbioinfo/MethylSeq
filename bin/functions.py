@@ -14,7 +14,6 @@ import logging
 import subprocess
 from joblib import Parallel, delayed
 import multiprocessing
-# version v01
 
 def make_sure_path_exists(path):
     try:
@@ -124,50 +123,6 @@ def slash_terminate(s):
     '''
     return(s if s.endswith('/') else s + '/')
 
-def runAndCheck(cmd, msg):
-    '''Run the given command and check the return value.
-
-        If the return value of the command is not 0 (success),
-        print the given error message and quit with
-        exit code 1.
-
-        --cmd - the command to be run
-        --msg - the message to print if the command returns an error
-    '''
-    logger = logging.getLogger("runMethylationAnalysis.functions")
-    logger.debug("Invoking: " + cmd)
-    try:
-        retcode = subprocess.call(cmd, shell=True, stderr=subprocess.STDOUT)
-        if retcode != 0:
-            logger.debug("System call returned "+str(retcode))
-            logger.error(msg+". Quitting.")
-            sys.exit(1)
-    except OSError as e:
-        logger.exception("Error invoking command")
-        print >>sys.stderr, "Execution exception:", e
-        sys.exit(1)
-
-def srun(cmd, ncores="1", mem=""):
-    '''Run the given command through srun.
-
-    If srun is available, the command will be run
-    with the given cores and memory. If srun is not
-    installed, the command is invoked directly.
-
-    --cmd - the command to be run
-    --ncores - the number of cores
-    --mem - the memory in Gb
-    '''
-    logger = logging.getLogger("runMethylationAnalysis.functions")
-    if(srun_is_installed()):
-        s = "srun -c "+str(ncores)+" "
-        s = s + " --mem="+str(mem)+"G " if mem else s
-        cmd = s+cmd
-    else:
-        logger.debug("srun not found")
-
-    runAndCheck(cmd, "Error in command") 
-
 def getWorkingDir(analysis_info_file):
     '''Get the working directory specified in the analysis info file
     '''
@@ -183,23 +138,12 @@ def getNCores(analysis_info_file):
 def testLogging():
     '''Testing for the logger
     ''' 
-    logger = logging.getLogger("runMethylationAnalysis.functions")
-    logger.info("Testing logging info level")
-    logger.debug("Testing logging debug level")
-    logger.error("Testing logging error level")
+    _logger = logging.getLogger(__name__)
+    _logger.info("Testing logging info level")
+    _logger.debug("Testing logging debug level")
+    _logger.error("Testing logging error level")
     try:
-        logger.info("Testing stack trace")
+        _logger.info("Testing stack trace")
         raise RuntimeError
     except Exception, err:
-        logger.exception("Expected exception")
-
-def srun_is_installed():
-    '''Tests if srun is installed. 
-
-        Uses 'command -v' for POSIX compliance; works in sh and bash.
-        When srun is not found, the result will be 1, else null.
-    '''
-    cmd = 'command -v srun >/dev/null 2>&1 || { echo "1" >&2; }'
-    p = subprocess.Popen(cmd, shell=True, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, close_fds=True)
-    output = p.stdout.read()
-    return(output != "1\n")
+        _logger.exception("Expected exception")

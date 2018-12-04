@@ -1,23 +1,17 @@
 #!/usr/bin/env python 
 
-import os
+import argparse
+from datetime import datetime
+import logging
 import os.path
 import sys
-import re
-import errno
-import glob
-import time
-import pickle
-import logging
-from joblib import Parallel, delayed
-import multiprocessing
-import subprocess
 import functions
-import argparse
-import validation
 import invokations
-import plotting
 import mapping
+import pipeline 
+import plotting
+import validation
+
 
 __version__ = 'v02'
 
@@ -27,19 +21,20 @@ def step_1():
     Checks the info files, runs bcl2fastq, and creates the sample names file
     for future scripts.
     '''
+    _logger = logging.getLogger(__name__)
     if not validation.validateSampleSheet(args.analysis_info_file):
-        logger.error("Sample sheet failed validation")
+        _logger.error("Sample sheet failed validation")
         sys.exit(1)
 
     invokations.invoke_bcl2fastq(args.analysis_info_file)
-
-    logger.info("Finished bcl2fastq. Output is in the fastq/ folder")
+    
+    _logger.info("Finished bcl2fastq. Output is in the fastq/ folder")
 
     invokations.create_sample_names(args.analysis_info_file)
 
     invokations.organize_working_directory()
 
-    logger.info("Finished running step 1")
+    _logger.info("Finished running step 1")
 
 def step_2():
     '''Run the second part of the analysis pipeline.
@@ -47,19 +42,20 @@ def step_2():
     Runs fastqc, trims reads, and generates the QC plots for 
     raw and trimmed data.
     '''
-    logger.info("Running fastqc")
+    _logger = logging.getLogger(__name__)
+    _logger.info("Running fastqc")
     invokations.qcReads()
 
-    logger.info("Creating plots and tables for raw data")
+    _logger.info("Creating plots and tables for raw data")
     plotting.fastqc_tables_and_plots(suffix_name='_raw', out_dir_report='Report/figure/rawQC', plot_device='pdf')
 
-    logger.info("Trimming reads")
+    _logger.info("Trimming reads")
     invokations.trim_reads()
 
-    logger.info("Creating plots and tables for trimmed data")
+    _logger.info("Creating plots and tables for trimmed data")
     plotting.fastqc_tables_and_plots(in_dir='trimmedReads/', out_dir='trimmedReads/', suffix_name='_trimmed', out_dir_report='Report/figure/trimmedQC', plot_device='pdf')
 
-    logger.info("Finished running step 2")
+    _logger.info("Finished running step 2")
 
 def step_3():
     '''Run the third part of the analysis pipeline.
@@ -67,13 +63,14 @@ def step_3():
     Maps and deduplicates reads with bismark, and creates mapping 
     QC plots.
     '''
-    logger.info("Running alignment")
+    _logger = logging.getLogger(__name__)
+    _logger.info("Running alignment")
     mapping.map_reads(run='bismark_alignment')
 
-    logger.info("Running deduplication")
+    _logger.info("Running deduplication")
     mapping.map_reads(run='deduplicate_bismark')
 
-    logger.info("Making plots")
+    _logger.info("Making plots")
 
     path        = functions.getWorkingDir(args.analysis_info_file)
     read_dir    = path + "alignedReads/"
@@ -81,71 +78,76 @@ def step_3():
     out_dir     = path + "Report/figure/mappingQC/"
     functions.make_sure_path_exists(out_dir)
 
-    cmd_str = ('/usr/bin/Rscript bin/mappingQC.R %s %s  _bismark_bt2_PE_report.txt %s' 
+    cmd_str = ('/usr/bin/Rscript src/mappingQC.R %s %s  _bismark_bt2_PE_report.txt %s' 
         % (read_dir, sample_file, out_dir))
 
-    functions.srun(cmd_str)
-    logger.info("Finished running step 3")
+    pipeline.srun(cmd_str, ncores=1, mem=20)
+    _logger.info("Finished running step 3")
 
 def step_4():
     '''Extract methylation data from the mapped reads
     '''
-    logger.info("Extracting methlyation data")
+    _logger = logging.getLogger(__name__)
+    _logger.info("Extracting methlyation data")
     invokations.extract_methylation(args.analysis_info_file)
     invokations.create_remove_bases_file_info("remove_bases.txt")
-    logger.info("Finished running step 4")
+    _logger.info("Finished running step 4")
 
 def step_5():
     '''Extract methylation data from the mapped reads using a remove bases file
     '''
-    logger.info("Extracting methlyation data with read trimming")
+    _logger = logging.getLogger(__name__)
+    _logger.info("Extracting methlyation data with read trimming")
     invokations.extract_methylation(analysis_info_file=args.analysis_info_file)
     invokations.calculate_coverage(args.analysis_info_file)
-    logger.info("Finished running step 5")
+    _logger.info("Finished running step 5")
 
 def step_6():
     '''Run differential methylation analysis
     '''
-    logger.info("Running differential methylation analysis")
+    _logger = logging.getLogger(__name__)
+    _logger.info("Running differential methylation analysis")
     invokations.analyse_methylation(args.analysis_info_file)
-    logger.info("Finished running step 6")
+    _logger.info("Finished running step 6")
 
 
-def setupLogger():
+def setup_logger():
     '''Configure the logger. 
-
-    Use a log file in the analysis working directory to store
-    all messages of level DEBUG or higher. Send all messages of
-    level INFO or higher to sdout.
+    Use a log file to store all messages of level DEBUG 
+    or higher. Send all messages of level INFO or higher
+    to sdout.
     '''
-    logger = logging.getLogger("runMethylationAnalysis")
-    logger.setLevel(logging.DEBUG)
-
-    fh = logging.FileHandler(functions.getWorkingDir(args.analysis_info_file)+"analysis.log")
- 
+    _logger = logging.getLogger()
+    pipeline.make_sure_path_exists("logs/")
+    _logger.setLevel(logging.DEBUG) 
+    logfile = "logs/"+datetime.now().strftime('analysis.%Y-%m-%d_%H-%M.log')
     formatter = logging.Formatter('%(asctime)s\t%(name)s\t%(funcName)s\t%(levelname)s\t%(message)s')
+
+    fh = logging.FileHandler(logfile)
     fh.setFormatter(formatter)
-    fh.setLevel(logging.DEBUG)
-    logger.addHandler(fh)
+    fh.setLevel(logging.DEBUG) # Log ALL THE THINGS to file
+    _logger.addHandler(fh)
 
     sh = logging.StreamHandler()
-    sh.setLevel(logging.INFO)
-    logger.addHandler(sh)
-    return(logger)
+    sh.setLevel(logging.INFO) # Log important things to console
+    _logger.addHandler(sh)       
 
 def check_info_file():
     ''' Check that the analysis info file is valid.
         Quit if file is not valid
     '''
     if not validation.validateAnalysisInfo(args.analysis_info_file):
-        logger.error("Analysis info file failed validation")
+        _logger.error("Analysis info file failed validation")
         sys.exit(1)
+    _logger.debug("Analysis info file passed validation")
 
 def runTests():
     ''' Run tests
     '''
-    logger.info("Testing function")
-    functions.testLogging() 
+    _logger = logging.getLogger(__name__)
+    _logger.info("Testing pipeline module")
+    pipeline.testLogging() 
+    plotting.test()
 
 def noArgs():
     ''' Run when no --run argument was input
@@ -156,7 +158,7 @@ def noArgs():
 
 def makeRemoveFile():
     invokations.create_remove_bases_file_info("remove_bases.txt")
-
+    
 if __name__ == '__main__':
     
     parser = argparse.ArgumentParser(prog='runMethylationAnalysis.py',description = '')
@@ -186,7 +188,9 @@ if __name__ == '__main__':
         print "Run step 0 and try again"
         sys.exit(1)
 
-    logger = setupLogger()
+    setup_logger()
+    _logger = logging.getLogger(__name__)
+    _logger.debug(("Started script" ))
     check_info_file()
 
     # Run the command input
@@ -200,9 +204,7 @@ if __name__ == '__main__':
                 '': noArgs,
                 'create_remove_file': makeRemoveFile }
 
-    for i in argDict:
-        if(args.run==i):
-            logger.info("Running command '"+i+"'")
-            argDict[i]()
-
+    if(argDict[args.run]):
+        _logger.info(("Running command '%s' " % args.run))
+        argDict[args.run]()
     sys.exit(0)
