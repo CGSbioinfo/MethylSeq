@@ -338,7 +338,8 @@ func.env$runBetaRegression = function(){
   }
 
   rm(predictedMeth.split)
-  info( meta.env$log.file, "Parallel script can now be invoked")
+  info( meta.env$log.file, "Parallel script can now be invoked:")
+  info( meta.env$log.file, paste("srun -c 20 --mem=40G Rscript src/parallelBetaRegression.r ", meta.env$temp.image.path, 20, "F", meta.env$log.file))
 
   # Process each chunk in turn
   invisible(lapply(chunk.names, func.env$betaRegressionOnChunk, F ))
@@ -460,15 +461,12 @@ func.env$runNullBetaRegression = function(){
   }
 
   rm(predictedMethNull.split)
-  info( meta.env$log.file, "Parallel script can now be invoked")
+  info( meta.env$log.file, "Parallel script can now be invoked if desired")
+  info( meta.env$log.file, paste("srun -c 20 --mem=40G Rscript src/parallelBetaRegression.r ", meta.env$temp.image.path, 20, "T", meta.env$log.file))
+
 
   # Process each chunk in turn
   invisible(lapply(chunk.names, func.env$betaRegressionOnChunk, T ))
-
-  # At this point, you can invoke the parallelBetaRegression.r script on other node(s).
-  # srun <options> /usr/bin/Rscript bin/parallelBetaRegression.r <temp.folder.name> <ncores> <is.null.regression>
-  # Example:
-  # srun -w calculon -c 20 /usr/bin/Rscript bin/parallelBetaRegression.r tmpImages/ 20 T
 
   # Wait for all lock files to be removed - halts until other nodes finish processing
   locksRemoved = function(){

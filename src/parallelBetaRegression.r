@@ -5,15 +5,12 @@
 #   1 - the temporary .Rdata directory
 #   2 - the number of cores to use
 #   3 - run standard regression (F) or null regression (T)
-suppressMessages(library(BiSeq))
-suppressMessages(library(dplyr))
-suppressMessages(library(parallel))
-
 meta.env = new.env() # parameters for the analysis
 
 meta.env$temp.image.folder  = commandArgs(TRUE)[1]
 meta.env$ncores             = as.numeric(commandArgs(TRUE)[2])
 meta.env$isnull             = commandArgs(TRUE)[3]
+meta.env$log.file           = commandArgs(TRUE)[4]
 
 #' This function loads the external functions file.
 #' @title Load external functions
@@ -29,13 +26,15 @@ loadFunctionsFile = function(){
 
 loadFunctionsFile()
 
+install.missing(packages=c("dplyr", "parallel", biopackages=c("BiSeq")))
+
 meta.env$server = system("hostname", intern = TRUE)
 
-meta.env$log.file = paste0(meta.env$temp.image.folder, "log.txt")
+# meta.env$log.file = paste0(meta.env$temp.image.folder, "log.txt")
 info( meta.env$log.file, paste("Running parallel on", meta.env$server))
 
 meta.env$temp.image.folder = slashTerminate(meta.env$temp.image.folder)
-pathExistsOrQuit(meta.env$temp.image.folder, "Temp analysis folder")
+quit.if.not.exists(meta.env$temp.image.folder, "Temp analysis folder")
 
 ##################
 #
@@ -61,7 +60,7 @@ betaRegressionOnChromosome = function(chunk.name){
 
       saveRDS(result, file = resultsFile)
       time = printTimeTaken(proc.time() - ptm)
-      info( meta.env$log.file, paste(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, sep="\t"))
+      debug( meta.env$log.file, paste(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, sep="\t"))
       return()
     }
 
@@ -100,7 +99,7 @@ betaNullRegressionOnChromosome = function(chunk.name){
 
       saveRDS(result, file = resultsFile)
       time = printTimeTaken(proc.time() - ptm)
-      info( meta.env$log.file, paste(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, sep="\t"))
+      debug( meta.env$log.file, paste(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, sep="\t"))
       return()
     }
 
