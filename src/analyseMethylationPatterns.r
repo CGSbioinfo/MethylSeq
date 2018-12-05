@@ -252,7 +252,7 @@ func.env$betaRegressionOnChunk = function(chunk.name, is.null){
       }
       saveRDS(result, file = resultsFile)
       time = printTimeTaken(proc.time() - ptm)
-      info(meta.env$log.file, paste(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, sep = "\t"))
+      debug(meta.env$log.file, paste(meta.env$server, meta.env$ncores, chunk.name, nrow(obj), time, sep = "\t"))
       return()
     }
 
@@ -302,7 +302,7 @@ func.env$runBetaRegression = function(){
   }
    
 
-  # Beta regression takes *forever* if run on a small number of cores. While the task
+  # Beta regression takes a long time if run on a small number of cores. While the task
   # itself is embarassingly parallel, a limit is the memory in use at the point
   # mclapply gets invoked. Any object not modified during a UNIX fork() should share 
   # memory between parent and child, but in this case the methylDataRaw object is
@@ -491,7 +491,7 @@ func.env$runNullBetaRegression = function(){
   assign( "vario", vario, envir=data.env)
 
   # Plot the variogram
-  png(file=paste0(meta.env$temp.image.path,"Null_variogram.png"),width = 480, height=480)
+  png(file=paste0(meta.env$temp.image.path,meta.env$tissue, "_null_variogram.png"), width=480, height=480)
   plot(vario$variogram$v)
   dev.off()
 
@@ -506,7 +506,9 @@ func.env$runNullBetaRegression = function(){
 func.env$quitForVar = function(){
     save(data.env, file = paste0(meta.env$temp.image.path, meta.env$tissue,"_save_6.Rdata"))
     info( meta.env$log.file, "Quitting so you can examine the variogram")
+    info( meta.env$log.file, "Sill value should be the y-value approximately bisecting the horizontal component") 
     info( meta.env$log.file, "Adjust the sill value in the analysis info and rerun step 6")  
+ 
     quit(save="no", status=0)
 }
 
@@ -515,8 +517,7 @@ func.env$quitForVar = function(){
 #' @export
 func.env$smoothValues = function(){
   
-  sill_value= 0.30
-  info( meta.env$log.file, paste("Smoothing with sill value",sill_value,"..."))  
+  info( meta.env$log.file, paste("Smoothing with sill value",meta.env$sill,"..."))  
   # It is necessary to smooth the variogram. Especially for greater h the variogram 
   # tends to oscillate strongly. This is the reason why the default bandwidth 
   # increases with increasing h. Nevertheless, the smoothed variogram may further 
@@ -528,11 +529,11 @@ func.env$smoothValues = function(){
   # values with h > h_{range} are set to sill. Internally, the function lokerns 
   # from package lokerns is used for smoothing.
 
-  vario.sm = smoothVariogram(data.env$vario, sill=as.numeric(sill_value))
+  vario.sm = smoothVariogram(data.env$vario, sill=as.numeric(meta.env$sill))
   assign( "vario.sm", vario.sm, envir=data.env)
 
   # Plot the smoothed variogram
-  png(file=paste0(meta.env$temp.image.path,"Smooth_variogram.png"),width = 480, height=480)
+  png(file=paste0(meta.env$temp.image.path, meta.env$tissue, "_smooth_variogram.png"),width = 480, height=480)
   plot(data.env$vario$variogram$v)
   lines(vario.sm$variogram[,c("h", "v.sm")], col = "red", lwd = 1.5)
   dev.off()
@@ -664,7 +665,7 @@ func.env$findOverlapsWithGTF = function(){
     df$seqnames2 = factor(df$seqnames2,levels=unique(df$seqnames2))
 
     p = ggplot(df,aes(x=seqnames2, y=methLevel, col=value)) +
-     geom_point() + 
+     geom_jitter(width=0.1) + 
      facet_wrap(~Group) + 
      ggtitle(annot) + 
      scale_fill_gradient() + 
