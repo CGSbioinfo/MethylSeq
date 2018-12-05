@@ -405,9 +405,14 @@ func.env$runNullBetaRegression = function(){
   #' @title Choose null samples
   createNullSample = function(){
 
+    # Fetch the distinct groups in the sample
     sample.groups  = data.env$sampleGroups %>% distinct(Group) %>% unlist()
+
+    # Count the number of samples in each group
     sample.numbers = data.env$sampleGroups %>% group_by(Group) %>% summarise(n= n()) %>% select(n)
-    sample.count   = min(ceiling(sample.numbers/2)) # Number of samples from each group to select 
+
+    # Choose the number of samples to take from each group.
+    sample.count   = floor(min(sample.numbers)/2) # Example: Groups of 7 and 8  =  floor(7/2) = 3
 
     info( meta.env$log.file, paste("Choosing", sample.count, "samples from each group"))
     getNullSamplesForGroup = function(i){
