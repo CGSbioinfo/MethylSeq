@@ -207,6 +207,26 @@ warn = function(file, msg){
     logToFile(file, paste("WARN", msg, sep="\t"))
 }
 
+#' Log a list of data to file with log level INFO
+#' @param file the target file
+#' @param list the list of items to log
+#' @export
+info.list = function(file, list){
+  write.line = function(s) info(file, s)
+  lapply(list, write.line)
+}
+
+#' Log a list of data to file with log level INFO
+#' @param file the target file
+#' @param list the list of items to log
+#' @export
+debug.list = function(file, list){
+  write.line = function(s) debug(file, s)
+  lapply(list, write.line)
+}
+
+
+
 #' Ensure a string ends with /
 #' @param s the string
 #' @return the string ending with /
