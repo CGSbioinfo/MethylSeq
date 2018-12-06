@@ -412,8 +412,8 @@ func.env$runNullBetaRegression = function(){
     # Count the number of samples in each group
     sample.numbers = data.env$sampleGroups %>% group_by(Group) %>% summarise(n= n()) %>% select(n)
 
-    # Choose the number of samples to take from each group.
-    sample.count   = floor(min(sample.numbers)/2) # Example: Groups of 7 and 8  =  floor(7/2) = 3
+    # Choose the number of samples to take from each group. Must be a multiple of 2.
+    sample.count   = (floor(min(sample.numbers)/2)*2)
 
     info( meta.env$log.file, paste("Choosing", sample.count, "samples from each group"))
     getNullSamplesForGroup = function(i){
@@ -508,7 +508,6 @@ func.env$quitForVar = function(){
     info( meta.env$log.file, "Quitting so you can examine the variogram")
     info( meta.env$log.file, "Sill value should be the y-value approximately bisecting the horizontal component") 
     info( meta.env$log.file, "Adjust the sill value in the analysis info and rerun step 6")  
- 
     quit(save="no", status=0)
 }
 
@@ -552,16 +551,20 @@ func.env$smoothValues = function(){
   # We test each CpG cluster for the presence of at least one differentially 
   # methylated location at <q>; what can be interpreted as the size-weighted FDR on
   # clusters:
-  clusters.rej     = testClusters(locCor, FDR.cluster=0.1)
 
-  info( meta.env$log.file, 'Trimming clusters')  
-  # Error in IRanges with negative width. Remove row 50345
-  # idx <- GenomicRanges:::get_out_of_bound_index(ext_grn)
-  # if (length(idx) != 0L)
-  #     ext_grn <- ext_grn[-idx]
+  tryCatch({
+      clusters.rej     = testClusters(locCor, FDR.cluster=0.1)
+  }, error = function(e){
+      warn(meta.env$log.file, e)
+      info(meta.env$log.file, "No differentially methylated loci detected")
+      info(meta.env$log.file, "BiSeq analysis complete") 
+      quit(save="no", status=0)
+  })
 
+  
   # We then trim the rejected CpG clusters to remove the not differentially
   # methylated CpG sites at <q1>; what can be interpreted as the location-wise FDR:
+  info( meta.env$log.file, 'Trimming clusters')  
   clusters.trimmed = trimClusters(clusters.rej, FDR.loc=0.05)
 
   # We can now define the boundaries of DMRs as rejected CpG sites within which rejected 
@@ -664,7 +667,8 @@ func.env$findOverlapsWithGTF = function(){
     df = left_join(df,cov,by=c('Sample.Name','seqnames2'))
     df$seqnames2 = factor(df$seqnames2,levels=unique(df$seqnames2))
 
-    p = ggplot(df,aes(x=seqnames2, y=methLevel, col=value)) +
+    p = ggplot(df,aes(x=seqnames2, y=methLevel, group=Sample.Name, col=value)) +
+     geom_line(size=1, color='black')+
      geom_jitter(width=0.1) + 
      facet_wrap(~Group) + 
      ggtitle(annot) + 
