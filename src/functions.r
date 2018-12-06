@@ -5,13 +5,13 @@
 #' @title Install missing packages
 #' @param packages the R packages to install
 #' @param biopackages the Bioconductor packages to install
+#' @param repos the CRAN repositories to try. Passes through to install.packages
 #' @examples
 #' install.missing(packages=c("ggplot2", "dplyr"), biopackages=c("BiSeq", "rtracklayer"))
 #' @export
-install.missing = function(packages, biopackages=c()) {
+install.missing = function(packages, biopackages=c(), repos = "https://cran.ma.imperial.ac.uk/" ) {
   
-  source("https://bioconductor.org/biocLite.R")
-  
+  source("https://bioconductor.org/biocLite.R")  
   installIfNeededFromBioconductor = function(pkg){
     if(pkg %in% rownames(installed.packages()) == FALSE) {
       biocLite(pkg)
@@ -21,13 +21,19 @@ install.missing = function(packages, biopackages=c()) {
   
   installIfNeeded = function(pkg){
     if(pkg %in% rownames(installed.packages()) == FALSE) {
-      install.packages(pkg, dependencies = TRUE)
+      install.packages(pkg, dependencies = TRUE, repos = repos)
     }
     suppressPackageStartupMessages(library(pkg, character.only = TRUE, warn.conflicts = FALSE))
   }
 
-  lapply(biopackages, installIfNeededFromBioconductor)
-  lapply(packages, installIfNeeded)
+  tryCatch({
+      lapply(biopackages, installIfNeededFromBioconductor)
+      lapply(packages, installIfNeeded)
+    }, error=function(e){
+      cat("Error loading required libraries\n")
+      message(e)
+      quit()
+    })
 }
 
 #' Log the details of the current session info to the given
@@ -213,7 +219,7 @@ warn = function(file, msg){
 #' @export
 info.list = function(file, list){
   write.line = function(s) info(file, s)
-  lapply(list, write.line)
+  invisible(lapply(list, write.line))
 }
 
 #' Log a list of data to file with log level INFO
@@ -222,7 +228,7 @@ info.list = function(file, list){
 #' @export
 debug.list = function(file, list){
   write.line = function(s) debug(file, s)
-  lapply(list, write.line)
+  invisible(lapply(list, write.line))
 }
 
 
