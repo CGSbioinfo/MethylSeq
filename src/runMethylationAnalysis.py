@@ -104,12 +104,20 @@ def step_5():
     _logger.info("Finished running step 5")
 
 def step_6():
-    '''Run differential methylation analysis
+    '''Run differential methylation analysis via BiSeq
     '''
     _logger = logging.getLogger(__name__)
-    _logger.info("Running differential methylation analysis")
+    _logger.info("Running differential methylation analysis using BiSeq")
     invokations.analyse_methylation(args.analysis_info_file)
     _logger.info("Finished running step 6")
+
+def step_7():
+    '''Run differential methylation analysis via SVA
+    '''
+    _logger = logging.getLogger(__name__)
+    _logger.info("Running differential methylation analysis using SVA")
+    invokations.run_sva(args.analysis_info_file)
+    _logger.info("Finished running step 7")
 
 
 def setup_logger():
@@ -172,7 +180,7 @@ if __name__ == '__main__':
 
     # Choose a section of the pipeline to run
     parser.add_argument('--run', 
-        help='Choose a section of the pipeline to run. Possible options: step0_create_info, step1_prepare_analysis, step2_qc_and_trimming, step3_mapping_and_deduplication, step4_extract_methylation, step5_extract_methylation, step6_analyse_methylation, create_remove_file', 
+        help='Choose a section of the pipeline to run. Possible options: step0_create_info, step1_prepare_analysis, step2_qc_and_trimming, step3_mapping_and_deduplication, step4_extract_methylation, step5_extract_methylation, step6_analyse_methylation, step7_SVA_analysis, create_remove_file', 
         default='')
 
     args=parser.parse_args()
@@ -201,6 +209,7 @@ if __name__ == '__main__':
                 'step4_extract_methylation': step_4,
                 'step5_extract_methylation': step_5,
                 'step6_analyse_methylation': step_6,
+                'step7_SVA_analysis': step_7,
                 'test': runTests,
                 '': noArgs,
                 'create_remove_file': makeRemoveFile }

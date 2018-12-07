@@ -4,7 +4,6 @@
 
 meta.env = new.env() # parameters for the analysis
 data.env = new.env() # data for the ongoing analysis - serialisable
-func.env = new.env() # functions defined in this file
 
 #' This function loads the external functions source file.
 #' Detects the directory containing this script, and loads the function
@@ -73,35 +72,10 @@ log.session.info(meta.env$log.file)
 #
 ##################
 
-#' Check if the next analysis step output exists. If so, skip 
-#' this analysis step. If not, check if this step's output exists
-#' and if not, run the analysis.
-#' @title Run or skip analysis step
-#' @param nextStepTempFile the name of the temp file after this step
-#' @param tempFile the name of the temp file for this step
-#' @param runFunction the function to be run in this step
-#' @export
-func.env$runOrSkip = function(nextStepTempFile, tempFile, runFunction){
-  if(!file.exists(paste0(meta.env$temp.image.path, nextStepTempFile))){
-    tempFile = paste0(meta.env$temp.image.path, tempFile)
-    if(file.exists(tempFile)){
-      info( meta.env$log.file, paste0("Loading temporary analysis file... ", tempFile))
-      run.and.time( f=function(){load(tempFile, envir = globalenv())}, log.file = meta.env$log.file )
-      info( meta.env$log.file, paste0("Loaded temporary analysis file ", tempFile))
-    } else{
-      run.and.time(runFunction, meta.env$log.file)
-      info( meta.env$log.file, paste0("Saving temporary analysis file... ", tempFile))
-
-      # Only save the data values - ensures updated functions will not be overwritten 
-      run.and.time(f=function(){save(data.env, file = tempFile)}, log.file = meta.env$log.file)
-    }
-  }
-}
-
 #' Read the methylation sample files
 #' @title Read samples
 #' @export
-func.env$readSamples = function(){
+readSamples = function(){
 
   info( meta.env$log.file, paste0("Reading sample groups file '", meta.env$sample.group.file,"'..."))
 
@@ -136,7 +110,7 @@ func.env$readSamples = function(){
 #' Read the target region file and select these regions from methylation data
 #' @title Read target regions
 #' @export
-func.env$readTargetRegions = function(){
+readTargetRegions = function(){
   # Read target region annotations
   info( meta.env$log.file, "Reading target regions")
 
@@ -180,7 +154,7 @@ func.env$readTargetRegions = function(){
 #' Cluster CpGs and smooth the methylation
 #' @title Define clusters
 #' @export
-func.env$defineCpGClusters = function(){
+defineCpGClusters = function(){
   info( meta.env$log.file, "Defining Cpg clusters")
   # gps = paste(unique(colData(data.env$methylDataRaw.filter10.rk)$Group), collapse="' | '")
   # debug(meta.env$log.file, paste0("Groups to define for: ", gps))
@@ -223,7 +197,7 @@ func.env$defineCpGClusters = function(){
 #' @param chunk.name the name of the data chunk to process
 #' @param is.null T if this is the null model regression, F otherwise
 #' @export
-func.env$betaRegressionOnChunk = function(chunk.name, is.null){
+betaRegressionOnChunk = function(chunk.name, is.null){
 
     null.string = ifelse(is.null, ".null", "")
 
@@ -277,7 +251,7 @@ func.env$betaRegressionOnChunk = function(chunk.name, is.null){
 #' Run beta regression on the samples
 #' @title Run beta regression
 #' @export
-func.env$runBetaRegression = function(){
+runBetaRegression = function(){
   
   info( meta.env$log.file, paste("Running beta regression across", meta.env$ncores, "instances...", sep=" "))
 
@@ -342,7 +316,7 @@ func.env$runBetaRegression = function(){
   info( meta.env$log.file, paste("srun -c 20 --mem=40G Rscript src/parallelBetaRegression.r ", meta.env$temp.image.path, 20, "F", meta.env$log.file))
 
   # Process each chunk in turn
-  invisible(lapply(chunk.names, func.env$betaRegressionOnChunk, F ))
+  invisible(lapply(chunk.names, betaRegressionOnChunk, F ))
 
   # At this point, you can invoke the parallelBetaRegression.r script on other node(s).
   # srun <options> /usr/bin/Rscript bin/parallelBetaRegression.r <temp.folder.name> <ncores> <is.null.regression>
@@ -372,7 +346,7 @@ func.env$runBetaRegression = function(){
 #' Create a null model and run the null regression on the samples
 #' @title Run null regression
 #' @export
-func.env$runNullBetaRegression = function(){
+runNullBetaRegression = function(){
   info( meta.env$log.file, paste("Running resampled beta model regression for null hypothesis across", meta.env$ncores, "instances ...", sep=" "))
 
   #   # The aim is to detect CpG clusters containing at least one differentially methylated location.
@@ -466,7 +440,7 @@ func.env$runNullBetaRegression = function(){
 
 
   # Process each chunk in turn
-  invisible(lapply(chunk.names, func.env$betaRegressionOnChunk, T ))
+  invisible(lapply(chunk.names, betaRegressionOnChunk, T ))
 
   # Wait for all lock files to be removed - halts until other nodes finish processing
   locksRemoved = function(){
@@ -503,7 +477,7 @@ func.env$runNullBetaRegression = function(){
 #' Quit the script so the variogram can be examined.
 #' @title Save and quit 
 #' @export
-func.env$quitForVar = function(){
+quitForVar = function(){
     save(data.env, file = paste0(meta.env$temp.image.path, meta.env$tissue,"_save_6.Rdata"))
     info( meta.env$log.file, "Quitting so you can examine the variogram")
     info( meta.env$log.file, "Sill value should be the y-value approximately bisecting the horizontal component") 
@@ -514,7 +488,7 @@ func.env$quitForVar = function(){
 #' Smooth the variogram and identify DMRs
 #' @title Smooth variogram
 #' @export
-func.env$smoothValues = function(){
+smoothValues = function(){
   
   info( meta.env$log.file, paste("Smoothing with sill value",meta.env$sill,"..."))  
   # It is necessary to smooth the variogram. Especially for greater h the variogram 
@@ -585,7 +559,7 @@ func.env$smoothValues = function(){
 #' Find overlaps between the DMRs and genes, and export tables.
 #' @title Find genes overlapping DMRs
 #' @export
-func.env$findOverlapsWithGTF = function(){
+findOverlapsWithGTF = function(){
   info( meta.env$log.file, "Finding DMR overlaps with genes") 
   outputDir = paste0(dirname(meta.env$sample.group.file),"/Report/figure/DMR_results/")
   if(!dir.exists(outputDir)){
@@ -689,17 +663,14 @@ func.env$findOverlapsWithGTF = function(){
 ##################
 
 # The order in which functions should be run
-func.env$func.order = c(func.env$readSamples, func.env$readTargetRegions, func.env$defineCpGClusters, func.env$runBetaRegression,
-  func.env$runNullBetaRegression, func.env$quitForVar, func.env$smoothValues, func.env$findOverlapsWithGTF)
+func.order = c(readSamples, readTargetRegions, defineCpGClusters, runBetaRegression,
+  runNullBetaRegression, quitForVar, smoothValues, findOverlapsWithGTF)
 
 # The corresponding save points
-func.env$func.names = c(paste0(meta.env$tissue, "_save_", 1:8, ".RData"), paste0(meta.env$tissue,"_save_9_end.RData"))
+func.names = c(paste0(meta.env$temp.image.path, meta.env$tissue, "_save_", 1:(length(func.order)+1), ".RData")) # The corresponding save points
 
-for( i in 1:length(func.env$func.order)){
-  thisFile = func.env$func.names[i]
-  nextFile = func.env$func.names[i+1]
-  thisFunc = func.env$func.order[[i]]
-  func.env$runOrSkip(nextFile, thisFile, thisFunc)
-}
+run.functions = function(i)  run.or.skip(func.names[i+1], func.names[i], func.order[[i]], meta.env$log.file, data.env)
+
+invisible(lapply(1:length(func.order), run.functions))
 
 info( meta.env$log.file, "BiSeq analysis complete") 

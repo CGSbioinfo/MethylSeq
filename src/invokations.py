@@ -487,6 +487,28 @@ def analyse_methylation(analysis_info_file='analysis_info.txt',
     _logger.info("Running methylation analysis")
     pipeline.srun(cmdStr, ncores=ai['ncores'], mem=120)
 
+def run_sva(analysis_info_file='analysis_info.txt',
+    cov_dir='methylExtraction/', 
+    sample_group_file='sample_groups.txt',
+    temp_folder_name='SVA/'):
+    '''
+    Run differential methylation analysis in SVA.
+    '''
+    _logger = logging.getLogger(__name__)
+    if not os.path.exists(cov_dir):
+        logging.error("Input directory was not found: " + cov_dir)
+        sys.exit(1)
+        
+    ai=functions.read_analysis_info_file(analysis_info_file)
+
+    temp_folder_name = functions.slash_terminate(temp_folder_name)
+
+    cmdStr = ('/usr/bin/Rscript src/SVA.R %s %s %s %s %s ' 
+        % (sample_group_file, cov_dir, temp_folder_name, ai['gtf_file'], ai['tissue']))
+
+    _logger.info("Running SVA analysis")
+    pipeline.srun(cmdStr, ncores=ai['ncores'], mem=60)
+
 
 
 

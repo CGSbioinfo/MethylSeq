@@ -124,6 +124,31 @@ print.time.taken = function(proc.time.object, log.file){
     paste(days[3], hours[3], mins[3], secs[3], sep="\t")
 }
 
+#' Check if the next analysis step output exists. If so, skip 
+#' this analysis step. If not, check if this step's output exists
+#' and if not, run the analysis.
+#' @title Run or skip analysis step
+#' @param nextStepTempFile the name of the temp file after this step
+#' @param tempFile the name of the temp file for this step
+#' @param runFunction the function to be run in this step
+#' @param log.file the file to log output to
+#' @param data.env the environment to save to file
+#' @export
+run.or.skip = function(nextStepTempFile, tempFile, runFunction, log.file, data.env){
+  if(!file.exists(nextStepTempFile)){
+    if(file.exists(tempFile)){
+      info(log.file, paste0("Loading temporary analysis file... ", tempFile))
+      run.and.time( f=function(){ load(tempFile, envir = globalenv()) }, log.file = log.file )
+      info( log.file, paste0("Loaded temporary analysis file ", tempFile))
+    } else{
+      run.and.time(runFunction, log.file)
+      info( log.file, paste0("Saving temporary analysis file... ", tempFile))
+      # Only save the data values - ensures updated functions will not be overwritten 
+      run.and.time(f=function(){ save(data.env, file = tempFile) }, log.file = log.file)
+    }
+  }
+}
+
 #' Run the given function and print
 #' the time it took to complete.
 #' @title Run and time the given function
@@ -190,7 +215,8 @@ printEnvironmentSize = function(env){
 #' @export
 logToFile = function(file, msg){
     cat(msg, "\n")
-    cat(paste(Sys.time(), msg, "\n", sep="\t"), file=file, append=TRUE)
+    msg = gsub("^ ", "", paste(Sys.time(), msg, "\n", sep="\t"))
+    cat(msg, file=file, append=TRUE)
 }
 
 #' Log a message to file with log level INFO
@@ -198,11 +224,14 @@ logToFile = function(file, msg){
 #' @param msg the message
 #' @export
 info = function(file, msg){
-    logToFile(file, paste("INFO", msg, sep="\t"))
+    # logToFile(file, paste("INFO", msg, sep="\t"))
+    write.line = function(s) logToFile(file, paste("INFO", msg, sep="\t"))
+    invisible(lapply(list, write.line))
 }
 
 debug = function(file, msg){
-    logToFile(file, paste("DEBUG", msg, sep="\t"))
+    write.line = function(s) logToFile(file, paste("DEBUG", msg, sep="\t"))
+    invisible(lapply(list, write.line))
 }
 
 #' Log a message to file with log level WARN
@@ -218,8 +247,7 @@ warn = function(file, msg){
 #' @param list the list of items to log
 #' @export
 info.list = function(file, list){
-  write.line = function(s) info(file, s)
-  invisible(lapply(list, write.line))
+  info(file, list)
 }
 
 #' Log a list of data to file with log level INFO
@@ -227,8 +255,7 @@ info.list = function(file, list){
 #' @param list the list of items to log
 #' @export
 debug.list = function(file, list){
-  write.line = function(s) debug(file, s)
-  invisible(lapply(list, write.line))
+  debug(file, list)
 }
 
 
@@ -237,6 +264,6 @@ debug.list = function(file, list){
 #' @param s the string
 #' @return the string ending with /
 #' @export
-slashTerminate = function(s){
+slash.terminate = function(s){
     ifelse(endsWith(s, "/"), s, paste0(s, "/"))
 }
