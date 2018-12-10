@@ -58,6 +58,7 @@ ensure.dir.exists(meta.env$output.dir)
 #' Filter the incoming data by readcount. Discard the CpGs with the top n% of total read coverage in each sample; this should
 #' help remove artefacts due to PCR duplication
 load.data = function(){
+  info( meta.env$log.file, "Loading data")
   min.reads  = default.min.reads
   cov.filter = default.high.cov.filter
   info( meta.env$log.file, paste("Excluding loci with more than", cov.filter,"read coverage in any sample"))
@@ -105,7 +106,7 @@ load.data = function(){
       names(df) = data.env$sampleGroups$Sample.Name
       
       gathered = df %>% tidyr::gather(data.env$sampleGroups$Sample.Name, key = "sample_id", value = "total_reads")
-      plot.file  = paste0(meta.env$temp.image.path, file.name ,".png")
+      plot.file  = paste0(meta.env$output.dir, file.name ,".png")
       g = ggplot(gathered, aes(x=sample_id, y=total_reads))+
         geom_violin()+
         theme(axis.text.x = element_text(angle = 90, hjust = 1))
@@ -158,6 +159,7 @@ load.data = function(){
 }
 
 prep.data = function(){
+  info( meta.env$log.file, "Processing data")
   # Mean centre the b-values to prevent fully methylated or unmethylated values
   # swamping the results
   centred_m = as.data.frame(data.env$b_values) %>% 
@@ -183,7 +185,7 @@ run.sva = function(){
   tryCatch({
     data.env$svobj = sva::sva(data.env$centred_m,data.env$mod.real,data.env$mod.null,n.sv=NULL)
     }, error = function(e){
-      warn("Error calculating surrogates. Check if any locus b-values are perfectly correlated with group.")
+      warn(meta.env$log.file, "Error calculating surrogates. Check if any locus b-values are perfectly correlated with group.")
       quit(save="no", status=1)
     })
 
