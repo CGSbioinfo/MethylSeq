@@ -18,6 +18,7 @@ R packages:
 - purrr
 - tidyr
 - BiSeq (optional)
+- sva (optional)
 - parallel
 
 ---- 
@@ -39,7 +40,7 @@ R packages:
   
 **3**\. Create a bin/ folder. This folder will have the scripts you need to run the analysis:
 ```bash
- $ mkdir bin/ 
+ $ mkdir src/ 
 ```
   
   
@@ -57,19 +58,20 @@ This should print on your terminal screen the MethylSeq-master folder
 A folder named ```MethylSeq-master``` should appear. Check by just typing ls.
   
   
-**6**\. Move the contents of ```MethylSeq-master/bin``` to ```bin/```
+**6**\. Move the contents of ```MethylSeq-master/src``` to ```src/```
 ```bash
- $ mv MethylSeq-master/bin/* bin/
+ $ mv MethylSeq-master/src/* src/
 ```
-At this point you should have a directory where you will do the analysis and a bin/ folder in such directory with the analysis scripts copied from the github download.  
+At this point you should have a directory where you will do the analysis and a src/ folder in such directory with the analysis scripts copied from the github download.  
   
 ----
 ## Running the analysis
+
 All the analysis scripts are wrapped in the main python script ```runMethylationAnalysis.py```. This main script takes an argument ```--run```, which is used to indicate which section of the main script to run. A log file is created in the working directory called ```analysis.log```. 
 
-The analysis is intended to be run on a slurm cluster. The main script should be invoked without srun; this will then call ninstances of slurm, each with ncores. If the main script is invoked through srun, there will only be ncores available for subprocesses, which will be shared between the ninstances. If slurm is not installed, the script will still work, but slower.
+The analysis is intended to be run on a slurm cluster. The main script should be invoked without srun; this will then call ```ninstances``` of slurm, each with ```ncores``` cores. The reason for this is that if the main script is invoked through srun, there will only be ```ncores``` cores available for subprocesses, which will be shared between the ```ninstances```. If slurm is not installed, the script will still work, but analyses will be correspondingly slower.
 
-The following commands are used to run the analysis:  
+The following commands are used to run the analysis pipeline:  
 
 
 ### Step 0
@@ -77,7 +79,7 @@ The following commands are used to run the analysis:
 Run the setup to create an info file that contains parameters for the subsequent programs to be run.
 
 ```bash  
-$ python bin/runMethylationAnalysis.py --run step0_create_info
+$ python src/runMethylationAnalysis.py --run step0_create_info
 ```
 A file named ```analysis_info.txt``` will be created in the folder. Open it in a text editor or vi and fill it. For example: 
 >working_directory = /mnt/cgs-fs2/Bioinfo_pipeline/MethylSeq/test/aug2016/heroG/   
@@ -96,6 +98,7 @@ A file named ```analysis_info.txt``` will be created in the folder. Open it in a
 >dmr_bandwidth = 50  
 >gtf_file = /mnt/cgs-fs3/Sequencing/Genome/Sscrofa11.1/annotation/Sus_scrofa.Sscrofa11.1.90.gtf  
 >extract_cx = False  
+tissue = Cortex
 
 Field | Description | Values
 ------|------|------
@@ -115,35 +118,44 @@ sill | The sill value when smoothing variograms |  0-1
 dmr_bandwidth | The DMR smoothing width | Integer >=10
 gtf_file | The gene annotations for the reference genome in GTF format | 
 extract_cx | Should methylation calls be extracted in CX context | ```True``` or ```False```  
+tissue | the source of the sample | any sensible string
 
   
 ### Step 1
 Using the command ```--run step1_prepare_analysis```, the main script will read the analysis_info_file and run bcl2fastq, create a sample names file, and organize the working directory.
 
 ```bash
-$ python bin/runMethylationAnalysis.py --run step1_prepare_analysis
+$ python src/runMethylationAnalysis.py --run step1_prepare_analysis
 ```
 Once it finishes, there will be a folder ```rawReads/``` with fastq files sorted according to sample names. There will also be a ```sample_names.txt``` file with a list of sample names, one per line.  
+
+From the sample name file, create a sample group file. This is a tab separated file that contains extra information about the samples. The minimum required columns are ```Sample.Name```, ```Group``` and ```Tissue```. Other columns can be added as needed if modifying the downstream scripts. Example:
+
+```text
+Sample.Name Group   Tissue
+CQ_1299_anteriorcortex_non-aggr_S6  Non-aggr    Cortex
+CQ_1301_hypothalamus_aggrs_S3   Aggr    Hypothalamus
+```
   
-  
+
 ### Step 2 
 Using the command ```--run step2_qc_and_trimming```, the main script will read the analysis_info_file, the sample_names file and run fastqc, create a folder ```Report/figure/rawQC``` with plots, create a folder ```Report/figure/data``` with tables, run trim galore, run fastqc on the trimmed reads, and create a folder ```Report/figure/trimmedQC``` with plots:
 
 ```bash
-$ python bin/runMethylationAnalysis.py --run step2_qc_and_trimming
+$ python src/runMethylationAnalysis.py --run step2_qc_and_trimming
 ```
   
   
 ### Step 3
 Using the command ```--run step3_mapping_and_deduplication```, the main script will read the analysis_info_file, the sample_names file and run bismark and deduplication scripts. The output includes bam file (original and deduplicated), and log files of each sample, and will be saved in a folder ```alignedReads/``` (created automatically).
 ```bash
-$ python bin/runMethylationAnalysis.py --run step3_mapping_and_deduplication
+$ python src/runMethylationAnalysis.py --run step3_mapping_and_deduplication
 ```
 
 ### Step 4
 After checking the QC metrics in ```Report/figure/mappingQC/```, extract the methylation data using the command ```--run step4_extract_methylation```.
 ```bash
-$ python bin/runMethylationAnalysis.py --run step4_extract_methylation
+$ python src/runMethylationAnalysis.py --run step4_extract_methylation
 ```
 
 This creates 3 output files per sample: ```bedGraph.gz```, ```bismark.cov.gz```, and ```M-bias.txt```.   
@@ -175,7 +187,7 @@ CQ_1313_cortex_non-aggr_S4  |  9  |   6   |  10  |  7
 Run the methyl extraction again. This will remove biased bases from reads using the information in  ```remove_bases.txt```.    
 
 ```bash
-$ python bin/runMethylationAnalysis.py --run step5_extract_methylation
+$ python src/runMethylationAnalysis.py --run step5_extract_methylation
 ```
 The results will be output to ```Report/figure/methExtractQC/Mbias_plot_clipped.pdf```
 Confirm that the clipping of bases worked.
@@ -214,7 +226,7 @@ log_file | the file to write logging information to | a valid file path
 Example:
 
 ```bash
- $ srun -c 20 --mem=20G /usr/bin/Rscript bin/parallelBetaRegression.r biseqAnalysis 20 F ./biseqAnalysis/log.txt
+ $ srun -c 20 --mem=20G /usr/bin/Rscript src/parallelBetaRegression.r biseqAnalysis 20 F ./biseqAnalysis/log.txt
 
 ```
 
@@ -225,8 +237,25 @@ Multiple invokations of the parallel script can be made; the main script will wa
 Following variogram generation, the main script will exit to allow a sill value to be chosen. The variogram is saved to ```biseqAnalysis/Null_variogram.png```. Enter the desired sill in the analysis info file and rerun analysis step 6. The analysis will resume at the correct stage, and the smoothed variogram will be saved to ```biseqAnalysis/Smooth_variogram.png```
 
 ```bash
-$ python bin/runMethylationAnalysis.py --run step6_analyse_methylation
+$ python src/runMethylationAnalysis.py --run step6_analyse_methylation
 ```
 
 The detected DMRs will be exported to ```Report/figure/DMR_results/```. Tables with DMRs and DMRs overlapping genes are exported to ```Report/figure/DMR_results/DMRs_overlapping_target_regions.tsv``` and ```Report/figure/DMR_results/DMRs_overlapping_annotated_genes.tsv``` respectively.
 
+### Step 7 - Optional
+
+Run differential methylation analysis using SVA to correct for unknown cell type composition. Some familiarity with surrogate variable analysis is expected in order to interpret the results and adjust the script if necessary.
+
+```bash
+$ python src/runMethylationAnalysis.py --run step7_SVA_analysis
+```
+
+Logging for the differential analysis is output to console and to the file ```SVA/{date}.SVA.log.txt```.
+
+Since SVA is performing a CpG by CpG comparison of groups using limma, it needs a more stringent read threshold than BiSeq. The default parameters are to filter out loci with fewer than 5 reads in any sample. It also removes the top 1% most frequent reads from each sample, to avoid bias from PCR amplifiction. The total read counts and filtered read counts are exported to images.
+
+As with the BiSeq analysis, intermediate analysis steps are stored so you can modify and rerun sections if needed without repeating the whole time-consuming process.
+
+The output of the SVA is a list of significant CpGs at the p=0.05 threshold after FDR correction, with a median methylation difference of at least 5% between groups. CpGs overlapping genes are also exported, plus a list of the unique genes.
+
+If a BiSeq analysis was run, the DMRs are compared to the SVA loci, and any overlaps are also exported.
