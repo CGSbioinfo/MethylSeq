@@ -128,23 +128,26 @@ print.time.taken = function(proc.time.object, log.file){
 #' this analysis step. If not, check if this step's output exists
 #' and if not, run the analysis.
 #' @title Run or skip analysis step
-#' @param nextStepTempFile the name of the temp file after this step
-#' @param tempFile the name of the temp file for this step
-#' @param runFunction the function to be run in this step
+#' @param next.temp.file the name of the temp file after this step
+#' @param temp.file the name of the temp file for this step
+#' @param function.to.run the function to be run in this step
 #' @param log.file the file to log output to
 #' @param data.env the environment to save to file
 #' @export
-run.or.skip = function(nextStepTempFile, tempFile, runFunction, log.file, data.env){
-  if(!file.exists(nextStepTempFile)){
-    if(file.exists(tempFile)){
-      info(log.file, paste0("Loading temporary analysis file... ", tempFile))
-      run.and.time( f=function(){ load(tempFile, envir = globalenv()) }, log.file = log.file )
-      info( log.file, paste0("Loaded temporary analysis file ", tempFile))
+run.or.skip = function(next.temp.file, temp.file, function.to.run, log.file, data.env){
+  if(!file.exists(next.temp.file)){
+    # The next step has not been run. Has the current step been run?
+    if(file.exists(temp.file)){
+      # The current step has been run. Load the data.
+      info(log.file, paste0("Loading temporary analysis file ", temp.file, "..."))
+      run.and.time( f=function(){ load(temp.file, envir = globalenv()) }, log.file = log.file )
+      info( log.file, paste0("Loaded temporary analysis file ", temp.file))
     } else{
-      run.and.time(runFunction, log.file)
-      info( log.file, paste0("Saving temporary analysis file... ", tempFile))
-      # Only save the data values - ensures updated functions will not be overwritten 
-      run.and.time(f=function(){ save(data.env, file = tempFile) }, log.file = log.file)
+      # The current step has not been run. Run it, and save the data.
+      run.and.time(function.to.run, log.file)
+      info( log.file, paste0("Saving temporary analysis file ", temp.file, "..."))
+      # Only save the given data environment - ensures updated script functions will not be overwritten 
+      run.and.time(f=function(){ save(data.env, file = temp.file) }, log.file = log.file)
     }
   }
 }
@@ -219,19 +222,22 @@ logToFile = function(file, msg){
     cat(msg, file=file, append=TRUE)
 }
 
-#' Log a message to file with log level INFO
+#' Log a message (or list of messages) to file with log level INFO
 #' @param file the target file
-#' @param msg the message
+#' @param msg the message(s)
 #' @export
 info = function(file, msg){
-    # logToFile(file, paste("INFO", msg, sep="\t"))
-    write.line = function(s) logToFile(file, paste("INFO", msg, sep="\t"))
-    invisible(lapply(list, write.line))
+    write.line = function(s) logToFile(file, paste("INFO", s, sep="\t"))
+    invisible(lapply(msg, write.line))
 }
 
+#' Log a message (or list of messages) to file with log level DEBUG
+#' @param file the target file
+#' @param msg the message(s)
+#' @export
 debug = function(file, msg){
-    write.line = function(s) logToFile(file, paste("DEBUG", msg, sep="\t"))
-    invisible(lapply(list, write.line))
+    write.line = function(s) logToFile(file, paste("DEBUG", s, sep="\t"))
+    invisible(lapply(msg, write.line))
 }
 
 #' Log a message to file with log level WARN
@@ -242,25 +248,7 @@ warn = function(file, msg){
     logToFile(file, paste("WARN", msg, sep="\t"))
 }
 
-#' Log a list of data to file with log level INFO
-#' @param file the target file
-#' @param list the list of items to log
-#' @export
-info.list = function(file, list){
-  info(file, list)
-}
-
-#' Log a list of data to file with log level INFO
-#' @param file the target file
-#' @param list the list of items to log
-#' @export
-debug.list = function(file, list){
-  debug(file, list)
-}
-
-
-
-#' Ensure a string ends with /
+#' Ensure a string ends with '/'
 #' @param s the string
 #' @return the string ending with /
 #' @export

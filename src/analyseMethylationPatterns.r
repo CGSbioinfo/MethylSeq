@@ -56,7 +56,7 @@ if(!is.na(meta.env$target.region.file)){
   quit.if.not.exists(meta.env$target.region.file, "Target region file")
 }
 
-meta.env$temp.folder.name = slashTerminate(meta.env$temp.folder.name)
+meta.env$temp.folder.name = slash.terminate(meta.env$temp.folder.name)
 
 meta.env$temp.image.path = paste0(dirname(meta.env$sample.group.file),"/", meta.env$temp.folder.name)
 ensure.dir.exists(meta.env$temp.image.path)
@@ -643,7 +643,7 @@ findOverlapsWithGTF = function(){
 
     p = ggplot(df,aes(x=seqnames2, y=methLevel, group=Sample.Name, col=value)) +
      geom_line(size=1, color='black')+
-     geom_jitter(width=0.1) + 
+     geom_point() + 
      facet_wrap(~Group) + 
      ggtitle(annot) + 
      scale_fill_gradient() + 
